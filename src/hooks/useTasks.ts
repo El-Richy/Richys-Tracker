@@ -41,7 +41,7 @@ export function useTasks() {
       const localTasks = await db.tasks.where('userId').equals(user.id).toArray();
       setTasks(localTasks);
 
-      // 2. Sync desde Supabase
+      // 2. Sync desde Supabase (Maestro definitivo)
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
@@ -49,6 +49,15 @@ export function useTasks() {
 
       if (!error && data) {
         const mapped = data.map(mapSupabaseTask);
+        const remoteIds = new Set(mapped.map(t => t.id));
+
+        // Limpiar en Dexie lo que ya no está en Supabase
+        const toDelete = localTasks.filter(lt => !remoteIds.has(lt.id)).map(lt => lt.id);
+        if (toDelete.length > 0) {
+          await db.tasks.bulkDelete(toDelete);
+        }
+
+        // Actualizar/Insertar los de Supabase
         await db.tasks.bulkPut(mapped);
         setTasks(mapped);
       }
@@ -119,14 +128,21 @@ export function useTasks() {
   }, [updateTaskInStore]);
 
   const deleteTask = useCallback(async (id: string) => {
-    // 1. Dexie
-    await db.tasks.delete(id);
-    // 2. Store
-    removeTaskFromStore(id);
-    // 3. Supabase Sync
-    supabase.from('tasks').delete().eq('id', id).then(({ error }) => {
-      if (error) console.error('Sync delete task error:', error.message);
-    });
+    try {
+      // 1. Borrado en Supabase primero (Confirmar con la nube)
+      const { error } = await supabase.from('tasks').delete().eq('id', id);
+      if (error) {
+        console.error('Error al borrar tarea en Supabase:', error.message);
+      }
+
+      // 2. Dexie
+      await db.tasks.delete(id);
+
+      // 3. Store
+      removeTaskFromStore(id);
+    } catch (err) {
+      console.error('Local delete task error:', err);
+    }
   }, [removeTaskFromStore]);
 
   const toggleTask = useCallback(async (id: string) => {

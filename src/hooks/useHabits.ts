@@ -77,11 +77,12 @@ export function useHabits() {
     if (!user) return;
     setLoading(true);
     try {
+      // 1. Carga inicial rápida desde Dexie
       const localHabits = await db.habits.where('userId').equals(user.id).toArray();
       setHabits(localHabits);
       localHabits.forEach(scheduleHabitReminder);
 
-      // Sync desde Supabase en background
+      // 2. Sync desde Supabase (Maestro definitivo)
       const { data, error } = await supabase
         .from('habits')
         .select('*')
@@ -89,8 +90,19 @@ export function useHabits() {
 
       if (!error && data) {
         const mapped = data.map(mapSupabaseHabit);
+        const remoteIds = new Set(mapped.map(h => h.id));
+        
+        // Limpiar en Dexie lo que ya no está en Supabase
+        const toDelete = localHabits.filter(lh => !remoteIds.has(lh.id)).map(lh => lh.id);
+        if (toDelete.length > 0) {
+          await db.habits.bulkDelete(toDelete);
+          toDelete.forEach(id => clearHabitReminders(id));
+        }
+
+        // Actualizar/Insertar los de Supabase
         await db.habits.bulkPut(mapped);
         setHabits(mapped);
+        
         mapped.forEach((h) => {
           clearHabitReminders(h.id);
           scheduleHabitReminder(h);
@@ -414,13 +426,16 @@ export function useHabits() {
   }, [updateHabitInStore]);
 
   const deleteHabit = useCallback(async (id: string) => {
-    console.log('deleteHabit llamado con id:', id);
-    console.log('habits actuales en store:', 
-      useHabitStore.getState().habits.map(h => h.id)
-    );
-    console.log(`1. Iniciando delete: ${id}`);
     try {
-      // 1. Dexie Delete
+      // 1. Borrado inicial en Supabase (opcionalmente esperar o manejar error)
+      const { error } = await supabase.from('habits').delete().eq('id', id);
+      if (error) {
+        console.error('Error al borrar en Supabase:', error.message);
+        // Podríamos lanzar error si no queremos que se borre localmente si falla en nube, 
+        // pero para UX borramos local de todos modos.
+      }
+
+      // 2. Dexie Delete (Limpieza profunda)
       await db.habits.delete(id);
       clearHabitReminders(id);
       await db.habitLogs.where('habitId').equals(id).delete();
@@ -430,23 +445,12 @@ export function useHabits() {
       } catch (err) {
         console.warn('Omitiendo clean up de puntos local:', err);
       }
-      console.log('2. Dexie delete OK');
       
-      // 2. Zustand Store Update
+      // 3. Zustand Store Update (Solo al final para evitar re-render con datos antiguos de la nube)
       removeHabitFromStore(id);
-      const nuevaLista = useHabitStore.getState().habits;
-      console.log(`3. Store actualizado: quedan ${nuevaLista.length} habitos en store`);
-
-      // 3. Supabase Delete
-      const { error } = await supabase.from('habits').delete().eq('id', id);
-      if (error) {
-         console.error('4. Supabase delete error REAL:', error);
-      } else {
-         console.log('4. Supabase delete OK');
-      }
+      
     } catch (err) {
       console.error('Local delete habit error:', err);
-      alert('Hubo un error al eliminar el hábito localmente. Intenta de nuevo.');
     }
   }, [removeHabitFromStore]);
 
