@@ -1,16 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuthStore } from '../store';
+import { useAuthStore, useUiStore } from '../store';
 import { useHabits } from '../hooks/useHabits';
 import { useTasks } from '../hooks/useTasks';
 import { useJournal } from '../hooks/useJournal';
-import { getLocalDateStr } from '../utils/dateUtils';
 import { JournalForm } from '../components/JournalForm';
 import { JournalDetailModal } from '../components/JournalDetailModal';
 import { type TabId } from '../components/TabBar';
 import { supabase } from '../lib/supabase';
-import { useUiStore } from '../store';
 import type { Habit } from '../types';
+import { useRewards } from '../hooks/useRewards';
+import { QuickNoteModal } from '../components/QuickNoteModal';
 
 interface HomePageProps {
   onNavigate: (tab: TabId) => void;
@@ -25,38 +25,34 @@ const MOTIVADORES = [
   "Consistencia > Perfección 🎯"
 ];
 
-const MOODS: { val: 1 | 2 | 3 | 4 | 5, emoji: string }[] = [
-  { val: 1, emoji: '😞' },
-  { val: 2, emoji: '😕' },
-  { val: 3, emoji: '😐' },
-  { val: 4, emoji: '🙂' },
-  { val: 5, emoji: '😄' },
-];
+const MOOD_EMOJIS: Record<number, string> = {
+  1: '😞',
+  2: '😕',
+  3: '😐',
+  4: '🙂',
+  5: '😄',
+};
 
-import { useRewards } from '../hooks/useRewards';
+// MOODS removidos de esta sección (se manejan en JournalForm)
 
 export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
   const user = useAuthStore((s) => s.user);
   const { habits, totalPoints, toggleCheck, getLogForHabit } = useHabits();
   const { tasks, toggleTask } = useTasks();
-  const { entries, getRecuerdoDeHoy, createEntry } = useJournal();
+  const { createEntry, getRecuerdoDeHoy } = useJournal();
   const { rewards, estaDisponible } = useRewards();
 
   const [greeting, setGreeting] = useState('');
   const [motivator, setMotivator] = useState('');
   const [showJournalForm, setShowJournalForm] = useState(false);
-  const [quickMood, setQuickMood] = useState<1 | 2 | 3 | 4 | 5 | undefined>();
+  const [showQuickNoteForm, setShowQuickNoteForm] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
   const [autoOpenCamera, setAutoOpenCamera] = useState(false);
 
-  // Bug 2 — Name state
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [showNameModal, setShowNameModal] = useState(false);
   const [tempName, setTempName] = useState('');
 
-  const hoyStr = getLocalDateStr();
-
-  // 1. Initial Logic (Greeting + Name Check)
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 12) setGreeting('Buenos días');
@@ -65,7 +61,6 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
 
     setMotivator(MOTIVADORES[Math.floor(Math.random() * MOTIVADORES.length)]);
 
-    // Bug 2 — Name fetch
     const stored = localStorage.getItem('displayName');
     const meta = user?.user_metadata?.display_name;
     const finalName = stored || meta || null;
@@ -84,12 +79,10 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
     const name = tempName.trim();
     
     try {
-      // Save locally
       localStorage.setItem('displayName', name);
       setDisplayName(name);
       setShowNameModal(false);
 
-      // Save to Supabase metadata
       const { error } = await supabase.auth.updateUser({
         data: { display_name: name }
       });
@@ -109,16 +102,9 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
     month: 'long' 
   }).replace(/^\w/, (c) => c.toUpperCase());
 
-  // 2. Recuerdo Logic
-  const recuerdo = useMemo(() => getRecuerdoDeHoje(), [getRecuerdoDeHoy]);
+  const recuerdo = useMemo(() => getRecuerdoDeHoy(), [getRecuerdoDeHoy]);
 
-  // FIXME: Typescript error fix for the above memo
-  function getRecuerdoDeHoje() {
-    return getRecuerdoDeHoy();
-  }
-
-  // 3. Progreso Logic
-  const todayDay = new Date().getDay(); // 0-6
+  const todayDay = new Date().getDay();
   const activeHabitsToday = useMemo(() => 
     habits.filter(h => h.diasActivos.includes(todayDay))
   , [habits, todayDay]);
@@ -133,43 +119,50 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
     totalHabitosToday > 0 ? (habitosHoyCount / totalHabitosToday) * 100 : 0
   , [habitosHoyCount, totalHabitosToday]);
 
-  // 4. Tareas Logic
-  const tareasAlta = useMemo(() => 
-    tasks.filter(t => t.prioridad === 'alta' && !t.completada)
-  , [tasks]);
+  const visibleHabits = useMemo(() => {
+    const priorityOrder = { alta: 0, media: 1, baja: 2 };
+    
+    // Primaria: Hábitos activos hoy
+    let baseHabits = [...activeHabitsToday];
+    
+    // Si hay menos de 3, rellenar con otros hábitos para cumplir el mínimo de 3
+    if (baseHabits.length < 3) {
+      const otherHabits = habits.filter(h => !h.diasActivos.includes(todayDay));
+      const needed = 3 - baseHabits.length;
+      baseHabits = [...baseHabits, ...otherHabits.slice(0, needed)];
+    }
 
-  // 5. Recompensas Logic (Mejora 2)
+    const sorted = baseHabits.sort((a, b) => 
+      priorityOrder[a.prioridad || 'media'] - priorityOrder[b.prioridad || 'media']
+    );
+    
+    if (sorted.length <= 4) return sorted;
+    return sorted.slice(0, 4);
+  }, [activeHabitsToday, habits, todayDay]);
+
+  const visibleTasks = useMemo(() => {
+    const priorityOrder = { alta: 0, media: 1, baja: 2 };
+    const sorted = tasks
+      .filter(t => !t.completada)
+      .sort((a, b) => priorityOrder[a.prioridad || 'media'] - priorityOrder[b.prioridad || 'media']);
+    
+    // Mostrar entre 2 y 4.
+    if (sorted.length <= 4) return sorted;
+    return sorted.slice(0, 4);
+  }, [tasks]);
+
   const recompensasDisponibles = useMemo(() => 
     rewards.filter(r => estaDisponible(r)).slice(0, 2)
   , [rewards, estaDisponible]);
 
-  // 5. Journal Registro Logic
-  const entradasHoy = useMemo(() => 
-    entries.filter(e => getLocalDateStr(new Date(e.creadoEn)) === hoyStr)
-  , [entries, hoyStr]);
-
-  const hayRegistroHoy = entradasHoy.length > 0;
   
-  const ultimoRegistro = useMemo(() => 
-    entries.find(e => getLocalDateStr(new Date(e.creadoEn)) === hoyStr)
-  , [entries, hoyStr]);
+  // ultimoRegistro removido
 
-  const handleQuickMood = (val: 1 | 2 | 3 | 4 | 5) => {
-    setQuickMood(val);
-    setAutoOpenCamera(false);
-    setShowJournalForm(true);
-  };
-
-  const handleQuickPhoto = () => {
-    setQuickMood(undefined);
-    setAutoOpenCamera(true);
-    setShowJournalForm(true);
-  };
+  // Handlers removidos: ya no hay selección de humor rápida en Home
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-6 pb-12 space-y-8 overflow-x-hidden">
       
-      {/* SECCIÓN 1 — Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -179,7 +172,6 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
         <p className="text-accent text-sm font-medium mt-2 animate-pulse">{motivator}</p>
       </motion.div>
 
-      {/* SECCIÓN 2 — Recuerdo (Condicional) */}
       {recuerdo && (
         <motion.div
           className="bg-bg-card rounded-2xl border-l-4 border-l-accent border border-border p-5 shadow-lg cursor-pointer hover:bg-bg-elevated/50 transition-colors"
@@ -196,7 +188,9 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
             </span>
           </div>
           <div className="flex gap-4">
-            <span className="text-4xl shrink-0">{MOODS.find(m => m.val === recuerdo.estadoAnimo)?.emoji}</span>
+            <span className="text-4xl shrink-0">
+              {recuerdo.estadoAnimo ? MOOD_EMOJIS[recuerdo.estadoAnimo] : '📝'}
+            </span>
             <div className="space-y-1">
               {recuerdo.titulo && (
                 <h4 className="text-text-primary font-bold line-clamp-1">{recuerdo.titulo}</h4>
@@ -207,7 +201,6 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
         </motion.div>
       )}
 
-      {/* SECCIÓN 3 — Progreso del día */}
       <motion.div 
         className="bg-bg-card rounded-2xl border border-border p-5 space-y-6" 
         initial={{ opacity: 0 }} 
@@ -233,10 +226,10 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
           </div>
 
           <div className="grid grid-cols-1 gap-2 pt-2">
-            {activeHabitsToday.length === 0 ? (
+            {visibleHabits.length === 0 ? (
               <p className="text-xs text-text-secondary text-center py-2 italic">No hay hábitos programados para hoy</p>
             ) : (
-              activeHabitsToday.map(habit => {
+              visibleHabits.map((habit: Habit) => {
                 const log = getLogForHabit(habit.id);
                 const isChecked = log?.completado || false;
                 return (
@@ -246,7 +239,12 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
                       isChecked ? 'bg-accent/5 border-accent/20' : 'bg-bg-primary/40 border-border/50'
                     }`}
                   >
-                    <span className="text-xl">{habit.icono}</span>
+                    <div className="flex flex-col items-center min-w-[24px]">
+                      <span className="text-xl">{habit.icono}</span>
+                      {habit.prioridad === 'alta' && !isChecked && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse -mt-1" title="Alta prioridad" />
+                      )}
+                    </div>
                     <span className={`text-sm font-medium flex-1 ${isChecked ? 'text-text-primary/60 line-through' : 'text-text-primary'}`}>
                       {habit.nombre}
                     </span>
@@ -272,112 +270,101 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
         </p>
       </motion.div>
 
-      {/* SECCIÓN 4 — Tareas prioritarias */}
       <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
         <div className="flex items-center justify-between px-1">
           <h3 className="text-sm font-bold text-text-secondary uppercase tracking-widest flex items-center gap-2">
-            <span className="text-accent animate-bounce">⚡</span> Prioridad alta
+            <span className="text-accent">🚀</span> Mis Tareas
           </h3>
-          {tareasAlta.length > 3 && (
-            <button 
-              onClick={() => onNavigate('tasks')}
-              className="text-accent text-xs font-bold hover:underline"
-            >
-              Ver todas →
-            </button>
-          )}
+          <button 
+            onClick={() => onNavigate('tasks')}
+            className="text-accent text-xs font-bold hover:underline"
+          >
+            Ver todas →
+          </button>
         </div>
         <div className="space-y-2">
-          {tareasAlta.length === 0 ? (
+          {visibleTasks.length === 0 ? (
             <div className="text-center text-text-secondary py-3 text-sm">
-              Sin urgencias hoy 🎉
+              Sin tareas pendientes 🎉
             </div>
           ) : (
-            tareasAlta.slice(0, 3).map(task => (
-              <div key={task.id} className="bg-bg-card border border-border p-4 rounded-xl flex items-center gap-3">
-                {/* Zona del checkbox — stopPropagation para no navegar */}
+            visibleTasks.map(task => (
+              <div key={task.id} className="bg-bg-card border border-border p-4 rounded-xl flex items-center gap-3 active:scale-[0.98] transition-transform">
                 <div 
                   onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }}
-                  className="w-5 h-5 rounded border-2 border-accent flex items-center justify-center cursor-pointer flex-shrink-0"
+                  className={`w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer flex-shrink-0 transition-all ${
+                    task.prioridad === 'alta' ? 'border-danger/50 bg-danger/5' : 'border-accent/50'
+                  }`}
                 >
                   {task.completada && <span className="text-accent text-xs">✓</span>}
                 </div>
                 
-                {/* Zona de navegación */}
-                <span 
-                  onClick={() => onNavigate('tasks')} 
-                  className="flex-1 cursor-pointer text-sm font-medium text-text-primary"
-                >
-                  {task.titulo}
-                </span>
+                <div className="flex-1 min-w-0" onClick={() => onNavigate('tasks')}>
+                  <p className="text-sm font-medium text-text-primary truncate">
+                    {task.titulo}
+                  </p>
+                  {task.prioridad === 'alta' && (
+                    <span className="text-[10px] text-danger font-bold uppercase tracking-wider">Alta Prioridad</span>
+                  )}
+                </div>
               </div>
             ))
           )}
         </div>
       </motion.div>
 
-      {/* SECCIÓN 5 — Entrada rápida al journal */}
       <motion.div 
         className="bg-bg-card rounded-2xl border border-border p-6 text-center space-y-6 cursor-pointer hover:bg-bg-elevated/20 transition-all active:scale-[0.99]" 
         initial={{ opacity: 0 }} 
         animate={{ opacity: 1 }} 
         transition={{ delay: 0.3 }}
-        onClick={() => !hayRegistroHoy && onNavigate('journal')}
+        onClick={() => onNavigate('journal')}
       >
-        <h3 className="text-lg font-bold text-text-primary">📓 ¿Cómo te sientes hoy?</h3>
+        <h3 className="text-lg font-bold text-text-primary">📓 Ideas y Recuerdos</h3>
         
-        {hayRegistroHoy ? (
-          <div className="space-y-4">
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-5xl">{MOODS.find(m => m.val === ultimoRegistro?.estadoAnimo)?.emoji}</span>
-              <p className="text-success text-sm font-bold flex items-center gap-1 uppercase tracking-tighter">Registrado hoy <span className="text-lg">✓</span></p>
+        <div className="grid grid-cols-1 gap-3">
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowQuickNoteForm(true); }}
+            className="group py-5 rounded-3xl border border-border bg-gradient-to-br from-bg-primary/50 to-bg-elevated/10 text-white hover:border-accent hover:from-accent/10 hover:to-accent/5 transition-all font-bold flex items-center justify-between px-6 shadow-sm active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-4">
+              <span className="text-3xl group-hover:rotate-12 transition-transform">📝</span>
+              <div className="text-left">
+                <span className="block text-sm">Nota rápida</span>
+                <span className="block text-[10px] text-text-secondary uppercase tracking-widest font-medium">Solo texto, al instante</span>
+              </div>
             </div>
-            <div className="flex gap-2 justify-center">
-              <button
-                onClick={(e) => { e.stopPropagation(); setQuickMood(undefined); setAutoOpenCamera(false); setShowJournalForm(true); }}
-                className="text-text-primary text-xs font-bold py-3 px-6 rounded-2xl bg-bg-primary border border-border hover:bg-bg-elevated transition-all flex items-center gap-2"
-              >
-                <span>📝 +Nota</span>
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleQuickPhoto(); }}
-                className="text-text-primary text-xs font-bold py-3 px-6 rounded-2xl bg-bg-primary border border-border hover:bg-bg-elevated transition-all flex items-center gap-2"
-              >
-                <span>📷 +Foto</span>
-              </button>
+            <span className="text-accent">→</span>
+          </button>
+
+          <button
+            onClick={(e) => { e.stopPropagation(); setAutoOpenCamera(false); setShowJournalForm(true); }}
+            className="group py-5 rounded-3xl border border-border bg-gradient-to-br from-bg-primary/50 to-bg-elevated/10 text-white hover:border-accent hover:from-accent/10 hover:to-accent/5 transition-all font-bold flex items-center justify-between px-6 shadow-sm active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-4">
+              <span className="text-3xl group-hover:rotate-12 transition-transform">📓</span>
+              <div className="text-left">
+                <span className="block text-sm">Entrada de Diario</span>
+                <span className="block text-[10px] text-text-secondary uppercase tracking-widest font-medium">Con emoción y detalles</span>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center max-w-[280px] mx-auto overflow-x-auto pb-2">
-              {MOODS.map(m => (
-                <button
-                  key={m.val}
-                  onClick={(e) => { e.stopPropagation(); handleQuickMood(m.val); }}
-                  className="text-4xl hover:scale-125 transition-transform active:scale-95 px-1"
-                >
-                  {m.emoji}
-                </button>
-              ))}
+            <span className="text-accent">→</span>
+          </button>
+
+          <button
+            onClick={(e) => { e.stopPropagation(); setAutoOpenCamera(true); setShowJournalForm(true); }}
+            className="group py-5 rounded-3xl border border-border bg-gradient-to-br from-bg-primary/50 to-bg-elevated/10 text-white hover:border-accent hover:from-accent/10 hover:to-accent/5 transition-all font-bold flex items-center justify-between px-6 shadow-sm active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-4">
+              <span className="text-3xl group-hover:rotate-12 transition-transform">📷</span>
+              <div className="text-left">
+                <span className="block text-sm">Foto rápida</span>
+                <span className="block text-[10px] text-text-secondary uppercase tracking-widest font-medium">Guarda una imagen</span>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={(e) => { e.stopPropagation(); setQuickMood(undefined); setAutoOpenCamera(false); setShowJournalForm(true); }}
-                className="py-4 rounded-2xl border border-border bg-bg-primary/50 text-text-primary hover:border-accent hover:bg-accent/5 transition-all font-bold flex flex-col items-center justify-center gap-1"
-              >
-                <span className="text-xl">📝</span>
-                <span className="text-[10px] uppercase tracking-widest">Nota rápida</span>
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleQuickPhoto(); }}
-                className="py-4 rounded-2xl border border-border bg-bg-primary/50 text-text-primary hover:border-accent hover:bg-accent/5 transition-all font-bold flex flex-col items-center justify-center gap-1"
-              >
-                <span className="text-xl">📷</span>
-                <span className="text-[10px] uppercase tracking-widest">Foto rápida</span>
-              </button>
-            </div>
-          </div>
-        )}
+            <span className="text-accent">→</span>
+          </button>
+        </div>
       </motion.div>
 
       {/* SECCIÓN 6 — Mis Recompensas (Mejora 2) */}
@@ -426,7 +413,6 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
       {/* Modales */}
       {showJournalForm && (
         <JournalForm
-          initialData={quickMood ? { estadoAnimo: quickMood } : undefined}
           autoOpenCamera={autoOpenCamera}
           onSubmit={(data) => {
             createEntry(data);
@@ -437,6 +423,16 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
             setShowJournalForm(false);
             setAutoOpenCamera(false);
           }}
+        />
+      )}
+
+      {showQuickNoteForm && (
+        <QuickNoteModal
+          onSubmit={(data) => {
+            createEntry({ ...data, fotos: [] });
+            setShowQuickNoteForm(false);
+          }}
+          onClose={() => setShowQuickNoteForm(false)}
         />
       )}
 

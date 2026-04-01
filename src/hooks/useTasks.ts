@@ -5,6 +5,7 @@ import { db } from '../db';
 import { supabase } from '../lib/supabase';
 import { Task } from '../types';
 import { generateId } from '../utils/idUtils';
+import { useNotifications } from './useNotifications';
 
 /**
  * Hook para el CRUD de tareas con patrón offline-first.
@@ -20,6 +21,8 @@ export function useTasks() {
     removeTask: removeTaskFromStore,
     setLoading,
   } = useTaskStore();
+  
+  const { scheduleTaskReminder, clearTaskReminders } = useNotifications();
 
   const user = useAuthStore((s) => s.user);
 
@@ -60,6 +63,13 @@ export function useTasks() {
         // Actualizar/Insertar los de Supabase
         await db.tasks.bulkPut(mapped);
         setTasks(mapped);
+
+        // Programar recordatorios pendientes
+        mapped.forEach(t => {
+          if (!t.completada && t.recordatorioHora) {
+            scheduleTaskReminder(t);
+          }
+        });
       }
     } catch (err) {
       console.error('Error loading tasks:', err);
@@ -70,7 +80,7 @@ export function useTasks() {
 
   // ─── CRUD ──────────────────────────────────────────────────
 
-  const createTask = useCallback(async (data: Pick<Task, 'titulo' | 'descripcion' | 'prioridad' | 'deadline' | 'subtareas'>) => {
+  const createTask = useCallback(async (data: Pick<Task, 'titulo' | 'descripcion' | 'prioridad' | 'deadline' | 'subtareas' | 'recordatorioHora'>) => {
     if (!user) return;
 
     const task: Task = {
@@ -81,6 +91,7 @@ export function useTasks() {
       completada: false,
       prioridad: data.prioridad,
       deadline: data.deadline,
+      recordatorioHora: data.recordatorioHora,
       subtareas: data.subtareas,
       creadoEn: new Date().toISOString(),
     };
@@ -98,12 +109,18 @@ export function useTasks() {
       completada: task.completada,
       prioridad: task.prioridad,
       deadline: task.deadline || null,
+      recordatorio_hora: task.recordatorioHora || null,
       subtareas: task.subtareas,
       creado_en: task.creadoEn,
     }).then(({ error }) => {
       if (error) console.error('Sync create task error:', error.message);
     });
-  }, [user, addTaskToStore]);
+
+    // 4. Recordatorio
+    if (task.recordatorioHora) {
+      scheduleTaskReminder(task);
+    }
+  }, [user, addTaskToStore, scheduleTaskReminder]);
 
   const editTask = useCallback(async (id: string, updates: Partial<Task>) => {
     // 1. Dexie
@@ -117,6 +134,7 @@ export function useTasks() {
     if (updates.completada !== undefined) sbUpdates.completada = updates.completada;
     if (updates.prioridad !== undefined) sbUpdates.prioridad = updates.prioridad;
     if (updates.deadline !== undefined) sbUpdates.deadline = updates.deadline || null;
+    if (updates.recordatorioHora !== undefined) sbUpdates.recordatorio_hora = updates.recordatorioHora || null;
     if (updates.subtareas !== undefined) sbUpdates.subtareas = updates.subtareas;
 
     supabase.from('tasks')
@@ -125,7 +143,17 @@ export function useTasks() {
       .then(({ error }) => {
         if (error) console.error('Sync update task error:', error.message);
       });
-  }, [updateTaskInStore]);
+
+    // 4. Recordatorios
+    const updatedTask = (await db.tasks.get(id)) as Task;
+    if (updatedTask) {
+      if (updatedTask.completada || !updatedTask.recordatorioHora) {
+        clearTaskReminders(id);
+      } else {
+        scheduleTaskReminder(updatedTask);
+      }
+    }
+  }, [updateTaskInStore, scheduleTaskReminder, clearTaskReminders]);
 
   const deleteTask = useCallback(async (id: string) => {
     try {
@@ -140,10 +168,13 @@ export function useTasks() {
 
       // 3. Store
       removeTaskFromStore(id);
+
+      // 4. Clear Reminders
+      clearTaskReminders(id);
     } catch (err) {
       console.error('Local delete task error:', err);
     }
-  }, [removeTaskFromStore]);
+  }, [removeTaskFromStore, clearTaskReminders]);
 
   const toggleTask = useCallback(async (id: string) => {
     const task = tasks.find(t => t.id === id);
@@ -227,6 +258,7 @@ function mapSupabaseTask(row: any): Task {
     completada: row.completada,
     prioridad: row.prioridad as Task['prioridad'],
     deadline: row.deadline || undefined,
+    recordatorioHora: row.recordatorio_hora || undefined,
     subtareas: row.subtareas || [],
     creadoEn: row.creado_en,
   };

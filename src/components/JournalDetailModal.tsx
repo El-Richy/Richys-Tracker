@@ -44,7 +44,9 @@ export function JournalDetailModal({ entry, onClose }: JournalDetailModalProps) 
         >
           {/* Header */}
           <div className="p-6 flex items-center justify-between z-10 sticky top-0 bg-bg-card/80 backdrop-blur-md border-b border-border">
-            <h3 className="text-text-secondary font-bold text-xs uppercase tracking-[0.2em]">Entrada del Diario</h3>
+            <h3 className="text-text-secondary font-bold text-xs uppercase tracking-[0.2em]">
+              {entry.tipo === 'note' ? 'Nota Rápida' : 'Entrada del Diario'}
+            </h3>
             <button 
               onClick={onClose} 
               className="text-text-secondary hover:text-white p-2 rounded-full hover:bg-bg-elevated transition-all"
@@ -56,18 +58,31 @@ export function JournalDetailModal({ entry, onClose }: JournalDetailModalProps) 
           <div className="flex-1 overflow-y-auto p-6 lg:p-10 space-y-10 custom-scrollbar">
             {/* Mood & Fecha */}
             <div className="flex flex-col items-center text-center space-y-4">
-              <motion.span 
-                className="text-7xl lg:text-8xl drop-shadow-xl"
-                initial={{ scale: 0.5, rotate: -20 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ type: 'spring', damping: 12 }}
-              >
-                {MOODS[entry.estadoAnimo].emoji}
-              </motion.span>
-              <div>
-                <p className="text-accent font-bold text-lg mb-1">{MOODS[entry.estadoAnimo].label}</p>
-                <p className="text-text-secondary text-sm capitalize">{dateStr}</p>
-              </div>
+              {entry.estadoAnimo ? (
+                <>
+                  <motion.span 
+                    className="text-7xl lg:text-8xl drop-shadow-xl"
+                    initial={{ scale: 0.5, rotate: -20 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: 'spring', damping: 12 }}
+                  >
+                    {MOODS[entry.estadoAnimo].emoji}
+                  </motion.span>
+                  <div>
+                    <p className="text-accent font-bold text-lg mb-1">{MOODS[entry.estadoAnimo].label}</p>
+                    <p className="text-text-secondary text-sm capitalize">{dateStr}</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-20 h-20 bg-bg-elevated rounded-full flex items-center justify-center text-4xl shadow-inner border border-border/50">
+                    📝
+                  </div>
+                  <div>
+                    <p className="text-text-secondary text-sm capitalize">{dateStr}</p>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Galería Horizontal */}

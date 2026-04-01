@@ -33,6 +33,7 @@ export interface HabitFormData {
   diasGracia: number;
   recordatorioHora: string | null;
   subtareas: Subtarea[];
+  prioridad: 'alta' | 'media' | 'baja';
 }
 
 export function HabitForm({ habit, onSubmit, onClose }: HabitFormProps) {
@@ -48,6 +49,9 @@ export function HabitForm({ habit, onSubmit, onClose }: HabitFormProps) {
   );
   const [subtareas, setSubtareas] = useState<Subtarea[]>(
     habit?.subtareas ?? []
+  );
+  const [prioridad, setPrioridad] = useState<'alta' | 'media' | 'baja'>(
+    habit?.prioridad ?? 'media'
   );
   const [newSubtask, setNewSubtask] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +75,7 @@ export function HabitForm({ habit, onSubmit, onClose }: HabitFormProps) {
       diasGracia,
       recordatorioHora: recordatorioHora || null,
       subtareas,
+      prioridad,
     });
   }
 
@@ -188,7 +193,7 @@ export function HabitForm({ habit, onSubmit, onClose }: HabitFormProps) {
 
             {/* Días activos */}
             <div>
-              <label className="block text-sm text-text-secondary mb-1.5">
+              <label className="block text-sm text-text-secondary mb-1.5 font-medium">
                 Días activos
               </label>
               <div className="flex gap-1.5">
@@ -197,13 +202,40 @@ export function HabitForm({ habit, onSubmit, onClose }: HabitFormProps) {
                     key={i}
                     type="button"
                     onClick={() => toggleDay(i)}
-                    className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
                       diasActivos.includes(i)
-                        ? 'bg-accent text-white'
-                        : 'bg-bg-elevated text-text-secondary'
+                        ? 'bg-accent text-white shadow-sm shadow-accent/20'
+                        : 'bg-bg-elevated text-text-secondary hover:bg-bg-elevated/80'
                     }`}
                   >
                     {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Prioridad */}
+            <div>
+              <label className="block text-sm text-text-secondary mb-1.5 font-medium">
+                Prioridad
+              </label>
+              <div className="flex gap-2 p-1 bg-bg-primary rounded-xl border border-border">
+                {[
+                  { value: 'alta', label: 'Alta', color: 'text-danger bg-danger/10 border-danger/20' },
+                  { value: 'media', label: 'Media', color: 'text-accent bg-accent/10 border-accent/20' },
+                  { value: 'baja', label: 'Baja', color: 'text-success bg-success/10 border-success/20' }
+                ].map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setPrioridad(p.value as any)}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all border ${
+                      prioridad === p.value 
+                        ? `${p.color} shadow-sm scale-[1.02]` 
+                        : 'text-text-secondary border-transparent hover:bg-bg-elevated'
+                    }`}
+                  >
+                    {p.label}
                   </button>
                 ))}
               </div>

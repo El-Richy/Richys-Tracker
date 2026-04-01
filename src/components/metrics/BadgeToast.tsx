@@ -18,16 +18,19 @@ export function BadgeToast() {
     if (pending && !toastBadge) {
       setToastBadge(pending);
       
-      // Mostrar por 4 segundos
+      // Mostrar por 6 segundos (dar tiempo a la animación)
       const timer = setTimeout(() => {
-        setToastBadge(null);
-        // Marcar como visto permanentemente
-        confirmBadgeSeen(pending.id);
-      }, 5000); // 5s para dar tiempo a la animación
+        handleDismiss(pending.id);
+      }, 6000);
 
       return () => clearTimeout(timer);
     }
-  }, [badges, toastBadge, confirmBadgeSeen]);
+  }, [badges, toastBadge]);
+
+  const handleDismiss = (id: string) => {
+    setToastBadge(null);
+    confirmBadgeSeen(id);
+  };
 
   return (
     <AnimatePresence>
@@ -64,6 +67,13 @@ export function BadgeToast() {
                 {toastBadge.descripcion}
               </p>
             </div>
+
+            <button 
+              onClick={() => handleDismiss(toastBadge.id)}
+              className="text-text-secondary hover:text-text-primary text-xs p-1"
+            >
+              ✕
+            </button>
           </div>
         </motion.div>
       )}

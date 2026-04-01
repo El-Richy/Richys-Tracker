@@ -3,7 +3,7 @@ import { useHabitStore } from '../store';
 import { useAuthStore } from '../store';
 import { db } from '../db';
 import { supabase } from '../lib/supabase';
-import type { Habit, HabitLog, BadgeStats } from '../types';
+import type { Habit, HabitLog, BadgeStats, PointEntry } from '../types';
 import { getLocalDateStr } from '../utils/dateUtils';
 import { calcularRacha, detectarMilestone } from '../utils/streakEngine';
 import {
@@ -235,7 +235,7 @@ export function useHabits() {
           ultimo_check: nuevaRacha.ultimoCheck || null,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'habit_id' },
+        { onConflict: 'habit_id,user_id' }
       )
       .then(({ error }) => {
         if (error) console.error('Sync streak error:', error.message);
@@ -322,11 +322,11 @@ export function useHabits() {
         setTotalPoints(calcularTotalPuntos(remainingEntries));
 
         // 3. Supabase Sync (Borrar entradas)
-        for (const id of ids) {
+        await Promise.all(ids.map(id => 
           supabase.from('point_entries').delete().eq('id', id).then(({ error }) => {
             if (error) console.error('Sync delete point entry error:', error.message);
-          });
-        }
+          })
+        ));
       }
     }
 
@@ -350,6 +350,7 @@ export function useHabits() {
       todosHabitosConRacha: postPointsStore.habits.length > 0 && postPointsStore.streaks.every(s => s.rachaActual > 0),
     };
 
+
     const nuevos = evaluarBadges(
       stats,
       postPointsStore.badges.map((b) => b.id),
@@ -361,21 +362,20 @@ export function useHabits() {
     }
   }
 
-  /** Sync un PointEntry a Supabase en background */
-  async function syncPointEntry(entry: typeof pointEntries[0]) {
+  async function syncPointEntry(entry: PointEntry) {
     try {
       const { error } = await supabase
         .from('point_entries')
         .insert({
           id: entry.id,
           user_id: entry.userId,
-          habit_id: entry.habitId ?? null,
-          creado_en: entry.fecha,
+          habit_id: entry.habitId || null,
           puntos: entry.puntos,
           razon: entry.razon,
+          creado_en: entry.fecha, // Usamos la fecha del registro
         });
       if (error) {
-        console.error('Sync point entry error completo:', error);
+        console.error('Sync point entry error:', error.message);
       }
     } catch (err: unknown) {
       console.error('Sync point entry EXCEPTION:', err);
@@ -385,7 +385,7 @@ export function useHabits() {
   // ─── CRUD de hábitos ──────────────────────────────────────
 
   const createHabit = useCallback(async (
-    data: Pick<Habit, 'nombre' | 'color' | 'icono' | 'subtareas' | 'diasActivos' | 'diasGracia' | 'recordatorioHora'>
+    data: Pick<Habit, 'nombre' | 'color' | 'icono' | 'subtareas' | 'diasActivos' | 'diasGracia' | 'recordatorioHora' | 'prioridad'>
   ) => {
     if (!user) return;
 
@@ -400,6 +400,7 @@ export function useHabits() {
       creadoEn: new Date().toISOString(),
       userId: user.id,
       subtareas: data.subtareas,
+      prioridad: data.prioridad || 'media',
     };
 
     // Dexie primero
@@ -419,14 +420,15 @@ export function useHabits() {
       dias_gracia: habit.diasGracia,
       subtareas: habit.subtareas,
       creado_en: habit.creadoEn,
+      prioridad: habit.prioridad,
     }).then(({ error }) => {
       if (error) console.error('Sync create habit error:', error.message);
     });
-  }, [user, addHabitToStore]);
+  }, [user, addHabitToStore, scheduleHabitReminder]);
 
   const editHabit = useCallback(async (
     id: string,
-    updates: Pick<Habit, 'nombre' | 'color' | 'icono' | 'subtareas' | 'diasActivos' | 'diasGracia' | 'recordatorioHora'>
+    updates: Pick<Habit, 'nombre' | 'color' | 'icono' | 'subtareas' | 'diasActivos' | 'diasGracia' | 'recordatorioHora' | 'prioridad'>
   ) => {
     // Dexie primero
     await db.habits.update(id, updates);
@@ -448,10 +450,11 @@ export function useHabits() {
       dias_activos: updates.diasActivos,
       dias_gracia: updates.diasGracia,
       subtareas: updates.subtareas,
+      prioridad: updates.prioridad,
     }).eq('id', id).then(({ error }) => {
       if (error) console.error('Sync update habit error:', error.message);
     });
-  }, [updateHabitInStore]);
+  }, [updateHabitInStore, clearHabitReminders, scheduleHabitReminder]);
 
   const deleteHabit = useCallback(async (id: string) => {
     try {
@@ -459,8 +462,7 @@ export function useHabits() {
       const { error } = await supabase.from('habits').delete().eq('id', id);
       if (error) {
         console.error('Error al borrar en Supabase:', error.message);
-        // Podríamos lanzar error si no queremos que se borre localmente si falla en nube, 
-        // pero para UX borramos local de todos modos.
+        // Para UX borramos local de todos modos.
       }
 
       // 2. Dexie Delete (Limpieza profunda)
@@ -480,7 +482,7 @@ export function useHabits() {
     } catch (err) {
       console.error('Local delete habit error:', err);
     }
-  }, [removeHabitFromStore]);
+  }, [removeHabitFromStore, clearHabitReminders]);
 
   // ─── Check diario ─────────────────────────────────────────
 
@@ -504,11 +506,38 @@ export function useHabits() {
     await db.habitLogs.put(log);
     upsertLog(log);
 
+    // AL DESMARCAR: Sistema Anti-Cheat AGRESIVO
+    if (!log.completado) {
+      const todayStr = today;
+      const entradasHoy = await db.pointEntries
+        .where('habitId')
+        .equals(habitId)
+        .filter(e => e.fecha === todayStr && e.puntos > 0)
+        .toArray();
+
+      if (entradasHoy.length > 0) {
+        const ids = entradasHoy.map(e => e.id);
+        await db.pointEntries.bulkDelete(ids);
+        
+        const currentEntries = useHabitStore.getState().pointEntries;
+        const remainingEntries = currentEntries.filter(e => !ids.includes(e.id));
+        useHabitStore.getState().setPointEntries(remainingEntries);
+        const newTotal = calcularTotalPuntos(remainingEntries);
+        useHabitStore.getState().setTotalPoints(newTotal);
+
+        for (const id of ids) {
+          supabase.from('point_entries').delete().eq('id', id).then(({ error }) => {
+            if (error) console.error('Sync delete point entry error:', error.message);
+          });
+        }
+      }
+    }
+
     if (log.completado) {
       clearHabitReminders(habitId);
       const storeHabit = useHabitStore.getState().habits.find(h => h.id === habitId);
       if (storeHabit) {
-        scheduleHabitReminder(storeHabit); // Re-programa solo el normal para mañana
+        scheduleHabitReminder(storeHabit);
       }
     }
 
@@ -526,7 +555,7 @@ export function useHabits() {
 
     // Efectos secundarios: racha, puntos, badges
     procesarPostCheck(habitId, log.completado);
-  }, [logs, upsertLog]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [logs, upsertLog, clearHabitReminders, scheduleHabitReminder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSubtask = useCallback(async (habitId: string, subtaskId: string) => {
     const today = getLocalDateStr();
@@ -662,6 +691,7 @@ function mapSupabaseHabit(row: Record<string, unknown>): Habit {
     creadoEn: row.creado_en as string,
     userId: row.user_id as string,
     subtareas: (row.subtareas as Habit['subtareas']) ?? [],
+    prioridad: (row.prioridad as Habit['prioridad']) ?? 'media',
   };
 }
 

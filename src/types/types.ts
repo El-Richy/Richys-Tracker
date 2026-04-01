@@ -21,6 +21,7 @@ export interface Habit {
   creadoEn: string;
   userId: string;
   subtareas: Subtarea[];
+  prioridad: 'alta' | 'media' | 'baja';
 }
 
 // ─── Log diario ───────────────────────────────────────────
@@ -108,6 +109,7 @@ export interface Task {
   completada: boolean;
   prioridad: 'alta' | 'media' | 'baja';
   deadline?: string;        // YYYY-MM-DD
+  recordatorioHora?: string; // HH:mm
   subtareas: Subtarea[];
   creadoEn: string;
 }
@@ -119,9 +121,10 @@ export interface JournalEntry {
   userId: string;
   titulo?: string;
   texto: string;
-  estadoAnimo: 1 | 2 | 3 | 4 | 5;  // 1=muy mal, 5=excelente
-  fotos: string[];                   // base64 strings, local por ahora
-  creadoEn: string;                  // ISO timestamp
+  estadoAnimo?: 1 | 2 | 3 | 4 | 5;
+  fotos: string[];
+  creadoEn: string;
+  tipo: 'journal' | 'note';
 }
 
 // ─── Recompensas ──────────────────────────────────────────────

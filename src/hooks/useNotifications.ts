@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { Habit } from '../types';
+import type { Habit, Task } from '../types';
 
 // Almacén global de timeouts para persistencia entre re-renders del hook
 const activeTimeouts = new Map<string, number[]>();
@@ -100,6 +100,51 @@ export function useNotifications() {
     addTimeout(habit.id, timeoutId);
   }, [addTimeout]);
 
+  const clearTaskReminders = useCallback((taskId: string) => {
+    const timeouts = activeTimeouts.get(taskId);
+    if (timeouts) {
+      timeouts.forEach((id) => window.clearTimeout(id));
+      activeTimeouts.delete(taskId);
+    }
+  }, []);
+
+  const scheduleTaskReminder = useCallback((task: Task) => {
+    if (!task.recordatorioHora || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    if (task.completada) return;
+
+    clearTaskReminders(task.id);
+
+    const [hours, minutes] = task.recordatorioHora.split(':').map(Number);
+    const now = new Date();
+    const targetTime = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      hours,
+      minutes,
+      0,
+      0
+    );
+
+    let msUntilReminder = targetTime.getTime() - now.getTime();
+    if (msUntilReminder < 0) {
+      // Si ya pasó hoy, programar para mañana
+      msUntilReminder += 24 * 60 * 60 * 1000;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      new Notification("Richy's Tracker", {
+        body: `📌 Recordatorio de tarea: ${task.titulo}`,
+        icon: '/favicon.svg',
+      });
+      // Reprogramar para mañana si no se ha completado
+      scheduleTaskReminder(task);
+    }, msUntilReminder);
+
+    addTimeout(task.id, timeoutId);
+  }, [addTimeout, clearTaskReminders]);
+
   // Cleanup automático al desmontar (opcional, pero útil si el hook se usa a nivel de página)
   // Nota: Dado que se usa en múltiples componentes, el cleanup global podría ser contraproducente.
   // Sin embargo, aseguramos que scheduleHabitReminder limpie los previos del mismo ID.
@@ -107,8 +152,10 @@ export function useNotifications() {
   return {
     requestPermission,
     scheduleHabitReminder,
+    scheduleTaskReminder,
     scheduleRiskReminder,
     clearHabitReminders,
+    clearTaskReminders,
     clearAllReminders,
   };
 }

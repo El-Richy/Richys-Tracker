@@ -113,6 +113,7 @@ export function useJournal() {
       estadoAnimo: data.estadoAnimo,
       fotos: fotosComprimidas,
       creadoEn: new Date().toISOString(),
+      tipo: data.estadoAnimo ? 'journal' : 'note',
     };
 
     // 1. Dexie
@@ -125,9 +126,10 @@ export function useJournal() {
       user_id: entry.userId,
       titulo: entry.titulo || null,
       texto: entry.texto,
-      estado_animo: entry.estadoAnimo,
-      fotos: [], // No sincronizar fotos a Supabase (según spec)
+      estado_animo: entry.estadoAnimo || null,
+      fotos: [], 
       creado_en: entry.creadoEn,
+      tipo: entry.tipo,
     }).then(({ error }) => {
       if (error) console.error('Sync create journal entry error:', error.message);
     });
@@ -151,7 +153,28 @@ export function useJournal() {
     }
   }, [removeEntry]);
 
-  const editEntry = useCallback(async (id: string, data: Partial<JournalEntry>) => {
+  const incrustarNotaEnJournal = useCallback(async (id: string, estadoAnimo: 1 | 2 | 3 | 4 | 5) => {
+     if (!user) return;
+ 
+     const updates = {
+       estadoAnimo,
+       tipo: 'journal' as const,
+     };
+ 
+     // 1. Dexie
+     await db.journalEntries.update(id, updates);
+     // 2. Store
+     updateEntryInStore(id, updates);
+     // 3. Supabase
+     supabase.from('journal_entries').update({
+       estado_animo: estadoAnimo,
+       tipo: 'journal'
+     }).eq('id', id).then(({ error }) => {
+       if (error) console.error('Sync embed note error:', error.message);
+     });
+   }, [user, updateEntryInStore]);
+ 
+   const editEntry = useCallback(async (id: string, data: Partial<JournalEntry>) => {
     if (!user) return;
 
     const updates: any = { ...data };
@@ -209,8 +232,10 @@ export function useJournal() {
     loadEntries,
     getRecuerdoDeHoy,
     comprimirImagen, 
+    incrustarNotaEnJournal,
   };
 }
+
 
 // ─── Mapper ───────────────────────────────────────────────
 
@@ -220,8 +245,9 @@ function mapSupabaseJournalEntry(row: any): JournalEntry {
     userId: row.user_id,
     titulo: row.titulo || undefined,
     texto: row.texto,
-    estadoAnimo: row.estado_animo,
-    fotos: row.fotos || [], // Vendrá vacío de Supabase
+    estadoAnimo: row.estado_animo || undefined,
+    fotos: row.fotos || [],
     creadoEn: row.creado_en,
+    tipo: row.tipo || 'journal',
   };
 }

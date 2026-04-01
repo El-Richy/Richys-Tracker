@@ -8,6 +8,7 @@ interface JournalCardProps {
   onDelete: () => void;
   onEdit: () => void;
   onOpen: () => void;
+  onEmbed?: (mood: 1 | 2 | 3 | 4 | 5) => void;
 }
 
 const MOOD_EMOJIS: Record<number, string> = {
@@ -18,11 +19,12 @@ const MOOD_EMOJIS: Record<number, string> = {
   5: '😄',
 };
 
-export function JournalCard({ entry, index = 0, onDelete, onEdit, onOpen }: JournalCardProps) {
+export function JournalCard({ entry, index = 0, onDelete, onEdit, onOpen, onEmbed }: JournalCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null);
+  const [showMoodPicker, setShowMoodPicker] = useState(false);
   
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -38,7 +40,7 @@ export function JournalCard({ entry, index = 0, onDelete, onEdit, onOpen }: Jour
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMenu]);
 
-  const moodEmoji = MOOD_EMOJIS[entry.estadoAnimo] || '😐';
+  const moodEmoji = entry.estadoAnimo ? MOOD_EMOJIS[entry.estadoAnimo] : '📝';
   
   // Formatear fecha
   const dateObj = new Date(entry.creadoEn);
@@ -59,7 +61,7 @@ export function JournalCard({ entry, index = 0, onDelete, onEdit, onOpen }: Jour
   return (
     <motion.div
       layout
-      className="bg-bg-card rounded-xl border border-border overflow-hidden cursor-pointer hover:bg-bg-elevated/30 transition-colors"
+      className="bg-bg-card rounded-xl border border-border cursor-pointer hover:bg-bg-elevated/30 transition-colors relative"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
@@ -91,11 +93,19 @@ export function JournalCard({ entry, index = 0, onDelete, onEdit, onOpen }: Jour
             <AnimatePresence>
               {showMenu && (
                 <motion.div
-                  className="absolute right-0 top-8 bg-bg-elevated border border-border rounded-lg shadow-lg z-10 min-w-[120px] overflow-hidden"
+                  className="absolute right-0 top-8 bg-bg-elevated border border-border rounded-lg shadow-lg z-10 min-w-[150px] overflow-hidden"
                   initial={{ opacity: 0, scale: 0.9, y: -5 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: -5 }}
                 >
+                  {entry.tipo === 'note' && (
+                    <button
+                      onClick={() => { setShowMenu(false); setShowMoodPicker(true); }}
+                      className="w-full px-4 py-2.5 text-sm text-accent hover:bg-bg-card text-left transition-colors border-b border-border/50 font-bold"
+                    >
+                      🚀 Incrustar Diario
+                    </button>
+                  )}
                   <button
                     onClick={() => { setShowMenu(false); onEdit(); }}
                     className="w-full px-4 py-2.5 text-sm text-text-primary hover:bg-bg-card text-left transition-colors border-b border-border/50"
@@ -113,6 +123,41 @@ export function JournalCard({ entry, index = 0, onDelete, onEdit, onOpen }: Jour
             </AnimatePresence>
           </div>
         </div>
+
+        {/* Mood Picker Overlay for Embedding */}
+        <AnimatePresence>
+          {showMoodPicker && (
+            <motion.div 
+              className="absolute inset-0 bg-bg-card/95 z-20 flex flex-col items-center justify-center p-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-4">¿Cómo te sentías en este momento?</p>
+              <div className="flex gap-2 mb-6">
+                {[1, 2, 3, 4, 5].map(m => (
+                  <button
+                    key={m}
+                    onClick={() => {
+                      onEmbed?.(m as any);
+                      setShowMoodPicker(false);
+                    }}
+                    className="text-3xl p-2 hover:bg-bg-elevated rounded-xl transition-transform active:scale-90"
+                  >
+                    {MOOD_EMOJIS[m]}
+                  </button>
+                ))}
+              </div>
+              <button 
+                onClick={() => setShowMoodPicker(false)}
+                className="text-[10px] font-bold text-text-secondary hover:text-text-primary uppercase tracking-widest"
+              >
+                CANCELAR
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Título y Texto */}
         <div className="relative">
@@ -228,4 +273,3 @@ export function JournalCard({ entry, index = 0, onDelete, onEdit, onOpen }: Jour
     </motion.div>
   );
 }
-

@@ -14,6 +14,7 @@ export interface TaskFormData {
   descripcion: string;
   prioridad: 'alta' | 'media' | 'baja';
   deadline: string;
+  recordatorioHora: string;
   subtareas: Subtarea[];
 }
 
@@ -24,6 +25,7 @@ export function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
     task?.prioridad ?? 'media'
   );
   const [deadline, setDeadline] = useState(task?.deadline ?? '');
+  const [recordatorioHora, setRecordatorioHora] = useState(task?.recordatorioHora ?? '');
   const [subtareas, setSubtareas] = useState<Subtarea[]>(
     task?.subtareas ?? []
   );
@@ -44,6 +46,7 @@ export function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
       descripcion: descripcion.trim(),
       prioridad,
       deadline: deadline || '',
+      recordatorioHora: recordatorioHora || '',
       subtareas,
     });
   }
@@ -129,6 +132,16 @@ export function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
                   className="w-full px-4 py-3 rounded-lg bg-bg-primary border border-border text-text-primary focus:border-accent outline-none"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm text-text-secondary mb-1.5">Recordatorio (opcional)</label>
+              <input
+                type="time"
+                value={recordatorioHora}
+                onChange={(e) => setRecordatorioHora(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg bg-bg-primary border border-border text-text-primary focus:border-accent outline-none transition-colors"
+              />
             </div>
 
             <div>

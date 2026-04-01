@@ -12,8 +12,9 @@ interface JournalFormProps {
 export interface JournalFormData {
   titulo?: string;
   texto: string;
-  estadoAnimo: 1 | 2 | 3 | 4 | 5;
+  estadoAnimo?: 1 | 2 | 3 | 4 | 5;
   fotos: string[];
+  tipo: 'journal' | 'note';
 }
 
 const MOODS: { val: 1 | 2 | 3 | 4 | 5, emoji: string }[] = [
@@ -32,7 +33,10 @@ export function JournalForm({
 }: JournalFormProps) {
   const [titulo, setTitulo] = useState(initialData?.titulo || '');
   const [texto, setTexto] = useState(initialData?.texto || '');
-  const [estadoAnimo, setEstadoAnimo] = useState<1 | 2 | 3 | 4 | 5>((initialData?.estadoAnimo as 1 | 2 | 3 | 4 | 5) || 3);
+  const [estadoAnimo, setEstadoAnimo] = useState<1 | 2 | 3 | 4 | 5 | undefined>(
+    (initialData?.estadoAnimo as 1 | 2 | 3 | 4 | 5) || (initialData?.tipo === 'note' ? undefined : 3)
+  );
+  const [tipo, setTipo] = useState<'journal' | 'note'>(initialData?.tipo || 'journal');
   const [fotos, setFotos] = useState<string[]>(initialData?.fotos || []);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +112,7 @@ export function JournalForm({
       texto: texto.trim(),
       estadoAnimo,
       fotos,
+      tipo: estadoAnimo ? 'journal' : 'note',
     });
   }
 
@@ -137,13 +142,32 @@ export function JournalForm({
 
             {/* 1. Selector de ánimo */}
             <div className="space-y-4">
-              <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest text-center">¿Cómo te sientes hoy?</label>
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                  {tipo === 'note' ? 'Añadir ánimo a esta nota' : '¿Cómo te sientes hoy?'}
+                </label>
+                {estadoAnimo && (
+                   <button 
+                     type="button" 
+                     onClick={() => {
+                        setEstadoAnimo(undefined);
+                        setTipo('note');
+                     }}
+                     className="text-[10px] text-accent font-bold"
+                   >
+                     REMOVER ÁNIMO
+                   </button>
+                )}
+              </div>
               <div className="flex justify-between max-w-sm mx-auto bg-bg-primary/50 p-2 rounded-2xl border border-border/50">
                 {MOODS.map((m) => (
                   <button
                     key={m.val}
                     type="button"
-                    onClick={() => setEstadoAnimo(m.val)}
+                    onClick={() => {
+                        setEstadoAnimo(m.val);
+                        setTipo('journal');
+                    }}
                     className={`text-4xl p-2 rounded-xl transition-all duration-300 ${
                       estadoAnimo === m.val 
                         ? 'bg-accent/20 ring-2 ring-accent scale-110 shadow-lg shadow-accent/10' 
@@ -231,7 +255,7 @@ export function JournalForm({
                 onChange={(e) => setTitulo(e.target.value)}
                 placeholder="Un gran día, Reflexión, etc."
                 className="w-full px-4 py-3 rounded-xl bg-bg-primary border border-border text-text-primary focus:border-accent outline-none transition-colors"
-                autoFocus
+                // autoFocus removido para priorizar el cuerpo de la nota
               />
             </div>
 
@@ -242,6 +266,7 @@ export function JournalForm({
                 onChange={(e) => setTexto(e.target.value)}
                 placeholder="Escribe tus pensamientos aquí..."
                 className="w-full px-4 py-4 rounded-xl bg-bg-primary border border-border text-text-primary focus:border-accent outline-none transition-colors min-h-[150px] resize-none leading-relaxed"
+                autoFocus
               />
             </div>
 

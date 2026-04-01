@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useJournal } from '../hooks/useJournal';
-import { useHabits } from '../hooks/useHabits';
 import { JournalCard } from '../components/JournalCard';
 import { JournalForm, type JournalFormData } from '../components/JournalForm';
 import { JournalDetailModal } from '../components/JournalDetailModal';
+import { QuickNoteModal } from '../components/QuickNoteModal';
 import { getLocalDateStr } from '../utils/dateUtils';
 import type { JournalEntry } from '../types';
 
@@ -16,12 +16,14 @@ export function JournalPage() {
     editEntry,
     deleteEntry,
     loadEntries,
+    incrustarNotaEnJournal,
   } = useJournal();
 
   const [showForm, setShowForm] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
-  const [filter, setFilter] = useState<'all' | 'notes' | 'photos'>('all');
+  const [showQuickNoteForm, setShowQuickNoteForm] = useState(false);
+  const [filter, setFilter] = useState<'journal' | 'note'>('journal');
 
   useEffect(() => {
     loadEntries();
@@ -39,9 +41,8 @@ export function JournalPage() {
 
   // Filtrado
   const filteredEntries = entries.filter(entry => {
-    if (filter === 'notes') return entry.fotos.length === 0;
-    if (filter === 'photos') return entry.fotos.length > 0;
-    return true;
+    if (filter === 'note') return entry.tipo === 'note';
+    return entry.tipo === 'journal';
   });
 
   // Agrupar entradas por día
@@ -76,7 +77,7 @@ export function JournalPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 pt-6 pb-24">
+    <div className="max-w-lg mx-auto px-4 pt-6 pb-24 min-h-[100dvh] flex flex-col">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-text-primary">Mi Diario</h1>
@@ -86,9 +87,8 @@ export function JournalPage() {
       {/* Filtros */}
       <div className="flex gap-2 mb-8 bg-bg-card p-1 rounded-2xl border border-border sticky top-0 z-10">
         {[
-          { id: 'all', label: 'Todos', icon: '📚' },
-          { id: 'notes', label: 'Notas', icon: '📝' },
-          { id: 'photos', label: 'Fotos', icon: '🖼️' },
+          { id: 'journal', label: 'Diario', icon: '📓' },
+          { id: 'note', label: 'Notas', icon: '📝' },
         ].map((f) => (
           <button
             key={f.id}
@@ -109,46 +109,79 @@ export function JournalPage() {
         <div className="text-center py-12 text-text-secondary">Cargando diario...</div>
       )}
 
-      {/* Empty State */}
-      {!isLoading && entries.length === 0 && (
-        <motion.div className="text-center py-20" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <div className="text-6xl mb-4">✍️</div>
-          <p className="text-text-secondary mb-2 text-lg">Tu diario está vacío</p>
-          <p className="text-text-secondary/60 text-sm">¿Cómo fue tu día? Empieza a escribir cada mañana o noche.</p>
-        </motion.div>
-      )}
-
-      {/* Lista agrupada */}
-      <div className="space-y-8">
-        {sortedDates.map(dateStr => (
-          <div key={dateStr}>
-            <h2 className="text-xs font-bold text-accent uppercase tracking-widest mb-4 px-2">
-              {getDayLabel(dateStr)}
-            </h2>
-            <div className="space-y-4">
-              <AnimatePresence>
-                {groupedEntries[dateStr].map((entry, i) => (
-                  <JournalCard
-                    key={entry.id}
-                    index={i}
-                    entry={entry}
-                    onDelete={() => deleteEntry(entry.id)}
-                    onEdit={() => {
-                      setEditingEntry(entry);
-                      setShowForm(true);
-                    }}
-                    onOpen={() => setSelectedEntry(entry)}
-                  />
-                ))}
-              </AnimatePresence>
+      {/* Contenido con Swipe */}
+      <motion.div
+        drag="x"
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0.2}
+        onDragEnd={(_, info) => {
+          const threshold = 100;
+          if (info.offset.x < -threshold && filter === 'journal') {
+            setFilter('note');
+          } else if (info.offset.x > threshold && filter === 'note') {
+            setFilter('journal');
+          }
+        }}
+        className="flex-1 min-h-[70vh] touch-pan-y"
+      >
+        {/* Empty State */}
+        {!isLoading && filteredEntries.length === 0 && (
+          <motion.div 
+            key={filter}
+            className="text-center py-20 px-6" 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="text-6xl mb-4">
+              {filter === 'journal' ? '📓' : '📝'}
             </div>
-          </div>
-        ))}
-      </div>
+            <p className="text-text-secondary mb-2 text-lg font-semibold">
+              {filter === 'journal' ? 'Tu diario está vacío' : 'No tienes notas rápidas'}
+            </p>
+            <p className="text-text-secondary/60 text-sm max-w-[240px] mx-auto">
+              {filter === 'journal' 
+                ? '¿Cómo estuvo tu día? Empieza a escribir tus pensamientos.' 
+                : 'Captura ideas rápidas, recordatorios o momentos fugaces.'}
+            </p>
+          </motion.div>
+        )}
+
+        {/* Lista agrupada */}
+        <div className="space-y-8">
+          {sortedDates.map(dateStr => (
+            <div key={dateStr}>
+              <h2 className="text-xs font-bold text-accent uppercase tracking-widest mb-4 px-2">
+                {getDayLabel(dateStr)}
+              </h2>
+              <div className="space-y-4">
+                <AnimatePresence mode="popLayout">
+                  {groupedEntries[dateStr].map((entry, i) => (
+                    <JournalCard
+                      key={entry.id}
+                      index={i}
+                      entry={entry}
+                      onDelete={() => deleteEntry(entry.id)}
+                      onEdit={() => {
+                        setEditingEntry(entry);
+                        setShowForm(true);
+                      }}
+                      onOpen={() => setSelectedEntry(entry)}
+                      onEmbed={(mood) => incrustarNotaEnJournal(entry.id, mood)}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
 
       {/* FAB */}
       <motion.button
-        onClick={() => setShowForm(true)}
+        onClick={() => {
+          if (filter === 'note') setShowQuickNoteForm(true);
+          else setShowForm(true);
+        }}
         className="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-accent text-white text-2xl shadow-lg shadow-accent/30 flex items-center justify-center z-20"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.9 }}
@@ -165,6 +198,16 @@ export function JournalPage() {
             setShowForm(false);
             setEditingEntry(null);
           }} 
+        />
+      )}
+
+      {showQuickNoteForm && (
+        <QuickNoteModal
+          onSubmit={(data) => {
+            createEntry({ ...data, fotos: [] });
+            setShowQuickNoteForm(false);
+          }}
+          onClose={() => setShowQuickNoteForm(false)}
         />
       )}
 
