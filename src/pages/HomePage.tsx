@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuthStore, useHabitStore } from '../store';
+import { useAuthStore } from '../store';
+import { useHabits } from '../hooks/useHabits';
 import { useTasks } from '../hooks/useTasks';
 import { useJournal } from '../hooks/useJournal';
 import { getLocalDateStr } from '../utils/dateUtils';
@@ -9,6 +10,7 @@ import { JournalDetailModal } from '../components/JournalDetailModal';
 import { type TabId } from '../components/TabBar';
 import { supabase } from '../lib/supabase';
 import { useUiStore } from '../store';
+import type { Habit } from '../types';
 
 interface HomePageProps {
   onNavigate: (tab: TabId) => void;
@@ -35,7 +37,7 @@ import { useRewards } from '../hooks/useRewards';
 
 export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
   const user = useAuthStore((s) => s.user);
-  const { habits, logs, totalPoints } = useHabitStore();
+  const { habits, totalPoints, toggleCheck, getLogForHabit } = useHabits();
   const { tasks, toggleTask } = useTasks();
   const { entries, getRecuerdoDeHoy, createEntry } = useJournal();
   const { rewards, estaDisponible } = useRewards();
@@ -116,15 +118,20 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
   }
 
   // 3. Progreso Logic
-  const habitosHoy = useMemo(() => 
-    logs.filter(l => l.fecha === hoyStr && l.completado).length
-  , [logs, hoyStr]);
+  const todayDay = new Date().getDay(); // 0-6
+  const activeHabitsToday = useMemo(() => 
+    habits.filter(h => h.diasActivos.includes(todayDay))
+  , [habits, todayDay]);
 
-  const totalHabitos = habits.length;
+  const habitosHoyCount = useMemo(() => 
+    activeHabitsToday.filter(h => getLogForHabit(h.id)?.completado).length
+  , [activeHabitsToday, getLogForHabit]);
+
+  const totalHabitosToday = activeHabitsToday.length;
   
   const progresoPercent = useMemo(() => 
-    totalHabitos > 0 ? (habitosHoy / totalHabitos) * 100 : 0
-  , [habitosHoy, totalHabitos]);
+    totalHabitosToday > 0 ? (habitosHoyCount / totalHabitosToday) * 100 : 0
+  , [habitosHoyCount, totalHabitosToday]);
 
   // 4. Tareas Logic
   const tareasAlta = useMemo(() => 
@@ -202,30 +209,66 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
 
       {/* SECCIÓN 3 — Progreso del día */}
       <motion.div 
-        className="bg-bg-card rounded-2xl border border-border p-5 space-y-4 cursor-pointer hover:bg-bg-elevated/20 transition-all active:scale-[0.99]" 
+        className="bg-bg-card rounded-2xl border border-border p-5 space-y-6" 
         initial={{ opacity: 0 }} 
         animate={{ opacity: 1 }} 
         transition={{ delay: 0.1 }}
-        onClick={() => onNavigate('habits')}
       >
-        <div className="flex justify-between items-end">
+        <div className="flex justify-between items-end cursor-pointer" onClick={() => onNavigate('habits')}>
           <div>
-            <h3 className="text-lg font-bold text-text-primary">Hábitos</h3>
+            <h3 className="text-lg font-bold text-text-primary">Hábitos de hoy</h3>
             <p className="text-xs text-text-secondary">{new Date().getDate()} de {new Date().toLocaleDateString('es-ES', { month: 'short' })}</p>
           </div>
-          <span className="text-accent font-bold text-xl">{habitosHoy} / {totalHabitos}</span>
+          <span className="text-accent font-bold text-xl">{habitosHoyCount} / {totalHabitosToday}</span>
         </div>
         
-        <div className="h-4 bg-bg-elevated rounded-full overflow-hidden border border-border/50">
-          <motion.div
-            className="h-full bg-accent shadow-[0_0_15px_rgba(240,97,26,0.3)]"
-            initial={{ width: 0 }}
-            animate={{ width: `${progresoPercent}%` }}
-            transition={{ duration: 1, ease: 'easeOut' }}
-          />
+        <div className="space-y-4">
+          <div className="h-2.5 bg-bg-elevated rounded-full overflow-hidden border border-border/50">
+            <motion.div
+              className="h-full bg-accent shadow-[0_0_15px_rgba(240,97,26,0.3)]"
+              initial={{ width: 0 }}
+              animate={{ width: `${progresoPercent}%` }}
+              transition={{ duration: 1, ease: 'easeOut' }}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 pt-2">
+            {activeHabitsToday.length === 0 ? (
+              <p className="text-xs text-text-secondary text-center py-2 italic">No hay hábitos programados para hoy</p>
+            ) : (
+              activeHabitsToday.map(habit => {
+                const log = getLogForHabit(habit.id);
+                const isChecked = log?.completado || false;
+                return (
+                  <div 
+                    key={habit.id}
+                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                      isChecked ? 'bg-accent/5 border-accent/20' : 'bg-bg-primary/40 border-border/50'
+                    }`}
+                  >
+                    <span className="text-xl">{habit.icono}</span>
+                    <span className={`text-sm font-medium flex-1 ${isChecked ? 'text-text-primary/60 line-through' : 'text-text-primary'}`}>
+                      {habit.nombre}
+                    </span>
+                    <button
+                      onClick={() => toggleCheck(habit.id)}
+                      className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                        isChecked 
+                          ? 'bg-accent border-accent text-white' 
+                          : 'border-border hover:border-accent/50'
+                      }`}
+                    >
+                      {isChecked && <span className="text-xs">✓</span>}
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
-        <p className="text-xs text-text-secondary text-center">
-          {progresoPercent === 100 ? '¡Hábitos completados! 🎉' : `${totalHabitos - habitosHoy} hábitos restantes para hoy`}
+
+        <p className="text-[10px] text-text-secondary text-center uppercase tracking-widest font-bold">
+          {progresoPercent === 100 ? '¡Día perfecto! 🎉' : `${totalHabitosToday - habitosHoyCount} restantes`}
         </p>
       </motion.div>
 
@@ -287,42 +330,52 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
           <div className="space-y-4">
             <div className="flex flex-col items-center gap-2">
               <span className="text-5xl">{MOODS.find(m => m.val === ultimoRegistro?.estadoAnimo)?.emoji}</span>
-              <p className="text-success text-sm font-bold flex items-center gap-1">Registrado hoy <span className="text-lg">✓</span></p>
+              <p className="text-success text-sm font-bold flex items-center gap-1 uppercase tracking-tighter">Registrado hoy <span className="text-lg">✓</span></p>
             </div>
             <div className="flex gap-2 justify-center">
               <button
-                onClick={() => { setQuickMood(undefined); setAutoOpenCamera(false); setShowJournalForm(true); }}
-                className="text-accent text-sm font-bold py-2.5 px-6 rounded-2xl bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-all flex items-center gap-2"
+                onClick={(e) => { e.stopPropagation(); setQuickMood(undefined); setAutoOpenCamera(false); setShowJournalForm(true); }}
+                className="text-text-primary text-xs font-bold py-3 px-6 rounded-2xl bg-bg-primary border border-border hover:bg-bg-elevated transition-all flex items-center gap-2"
               >
-                <span>+ Nota</span>
+                <span>📝 +Nota</span>
               </button>
               <button
-                onClick={handleQuickPhoto}
-                className="text-white text-sm font-bold py-2.5 px-6 rounded-2xl bg-bg-elevated border border-border hover:bg-bg-primary transition-all flex items-center gap-2"
+                onClick={(e) => { e.stopPropagation(); handleQuickPhoto(); }}
+                className="text-text-primary text-xs font-bold py-3 px-6 rounded-2xl bg-bg-primary border border-border hover:bg-bg-elevated transition-all flex items-center gap-2"
               >
-                <span>📷 Foto</span>
+                <span>📷 +Foto</span>
               </button>
             </div>
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="flex justify-between items-center max-w-[280px] mx-auto">
+            <div className="flex justify-between items-center max-w-[280px] mx-auto overflow-x-auto pb-2">
               {MOODS.map(m => (
                 <button
                   key={m.val}
-                  onClick={() => handleQuickMood(m.val)}
-                  className="text-4xl hover:scale-125 transition-transform active:scale-95"
+                  onClick={(e) => { e.stopPropagation(); handleQuickMood(m.val); }}
+                  className="text-4xl hover:scale-125 transition-transform active:scale-95 px-1"
                 >
                   {m.emoji}
                 </button>
               ))}
             </div>
-            <button
-              onClick={handleQuickPhoto}
-              className="w-full py-4 rounded-2xl border-2 border-dashed border-border text-text-secondary hover:border-accent hover:text-accent hover:bg-accent/5 transition-all font-bold flex items-center justify-center gap-2"
-            >
-              <span>📷 Foto rápida del momento</span>
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={(e) => { e.stopPropagation(); setQuickMood(undefined); setAutoOpenCamera(false); setShowJournalForm(true); }}
+                className="py-4 rounded-2xl border border-border bg-bg-primary/50 text-text-primary hover:border-accent hover:bg-accent/5 transition-all font-bold flex flex-col items-center justify-center gap-1"
+              >
+                <span className="text-xl">📝</span>
+                <span className="text-[10px] uppercase tracking-widest">Nota rápida</span>
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleQuickPhoto(); }}
+                className="py-4 rounded-2xl border border-border bg-bg-primary/50 text-text-primary hover:border-accent hover:bg-accent/5 transition-all font-bold flex flex-col items-center justify-center gap-1"
+              >
+                <span className="text-xl">📷</span>
+                <span className="text-[10px] uppercase tracking-widest">Foto rápida</span>
+              </button>
+            </div>
           </div>
         )}
       </motion.div>

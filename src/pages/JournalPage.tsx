@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useJournal } from '../hooks/useJournal';
+import { useHabits } from '../hooks/useHabits';
 import { JournalCard } from '../components/JournalCard';
 import { JournalForm, type JournalFormData } from '../components/JournalForm';
 import { JournalDetailModal } from '../components/JournalDetailModal';
@@ -20,6 +21,7 @@ export function JournalPage() {
   const [showForm, setShowForm] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
+  const [filter, setFilter] = useState<'all' | 'notes' | 'photos'>('all');
 
   useEffect(() => {
     loadEntries();
@@ -35,10 +37,17 @@ export function JournalPage() {
     setEditingEntry(null);
   }
 
+  // Filtrado
+  const filteredEntries = entries.filter(entry => {
+    if (filter === 'notes') return entry.fotos.length === 0;
+    if (filter === 'photos') return entry.fotos.length > 0;
+    return true;
+  });
+
   // Agrupar entradas por día
   const groupedEntries: Record<string, typeof entries> = {};
   
-  entries.forEach(entry => {
+  filteredEntries.forEach(entry => {
     const dateStr = getLocalDateStr(new Date(entry.creadoEn));
     if (!groupedEntries[dateStr]) {
       groupedEntries[dateStr] = [];
@@ -69,9 +78,31 @@ export function JournalPage() {
   return (
     <div className="max-w-lg mx-auto px-4 pt-6 pb-24">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-text-primary">Mi Diario</h1>
         <p className="text-sm text-text-secondary mt-1">Reflexiones y momentos</p>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex gap-2 mb-8 bg-bg-card p-1 rounded-2xl border border-border sticky top-0 z-10">
+        {[
+          { id: 'all', label: 'Todos', icon: '📚' },
+          { id: 'notes', label: 'Notas', icon: '📝' },
+          { id: 'photos', label: 'Fotos', icon: '🖼️' },
+        ].map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFilter(f.id as any)}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              filter === f.id 
+                ? 'bg-accent text-white shadow-lg shadow-accent/20' 
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            <span>{f.icon}</span>
+            <span>{f.label}</span>
+          </button>
+        ))}
       </div>
 
       {isLoading && entries.length === 0 && (
