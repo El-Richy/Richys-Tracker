@@ -1,31 +1,17 @@
-import type { Habit, HabitLog, Streak, EstadoRacha } from '../types';
+import type { Habit, Streak, EstadoRacha } from '../types';
 import { getLocalDateStr, subtractDays, getDayOfWeekFromStr } from './dateUtils';
 
 /**
  * Calcula la racha actual para un hábito dado sus logs.
- *
- * Algoritmo:
- * 1. Si hoy es día activo y fue completado → cuenta hacia la racha.
- * 2. Recorre hacia atrás desde ayer buscando días activos.
- * 3. Si un día activo fue completado → suma a la racha.
- * 4. Si un día activo NO fue completado → consume día de gracia.
- * 5. Si se agotan los días de gracia → racha rota, break.
- * 6. Días no activos se omiten (no rompen ni suman).
+ * Optimizada para rendimiento usando un Set de fechas pre-filtradas.
  */
 export function calcularRacha(
   habit: Habit,
-  logs: HabitLog[],
+  fechasCompletadas: Set<string>,
   rachaMaximaPrevia: number = 0,
 ): Streak {
   const hoy = getLocalDateStr();
   const hoyDow = getDayOfWeekFromStr(hoy);
-
-  // Set de fechas completadas para este hábito
-  const fechasCompletadas = new Set(
-    logs
-      .filter((l) => l.habitId === habit.id && l.completado)
-      .map((l) => l.fecha),
-  );
 
   let rachaActual = 0;
   let diasGraciaConsecutivos = 0;

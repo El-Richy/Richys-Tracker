@@ -120,35 +120,37 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
   , [habitosHoyCount, totalHabitosToday]);
 
   const visibleHabits = useMemo(() => {
-    const priorityOrder = { alta: 0, media: 1, baja: 2 };
+    const priorityOrder: Record<string, number> = { alta: 0, media: 1, baja: 2 };
     
-    // Primaria: Hábitos activos hoy
-    let baseHabits = [...activeHabitsToday];
-    
-    // Si hay menos de 3, rellenar con otros hábitos para cumplir el mínimo de 3
-    if (baseHabits.length < 3) {
-      const otherHabits = habits.filter(h => !h.diasActivos.includes(todayDay));
-      const needed = 3 - baseHabits.length;
-      baseHabits = [...baseHabits, ...otherHabits.slice(0, needed)];
-    }
-
-    const sorted = baseHabits.sort((a, b) => 
-      priorityOrder[a.prioridad || 'media'] - priorityOrder[b.prioridad || 'media']
+    // 1. Obtener hábitos activos hoy
+    const dailyActive = [...activeHabitsToday].sort((a, b) => 
+      (priorityOrder[a.prioridad || 'media'] ?? 1) - (priorityOrder[b.prioridad || 'media'] ?? 1)
     );
-    
-    if (sorted.length <= 4) return sorted;
-    return sorted.slice(0, 4);
+
+    // 2. Obtener el resto de hábitos
+    const others = habits
+      .filter(h => !h.diasActivos.includes(todayDay))
+      .sort((a, b) => (priorityOrder[a.prioridad || 'media'] ?? 1) - (priorityOrder[b.prioridad || 'media'] ?? 1));
+
+    // Unir priorizando los de hoy
+    let combined = [...dailyActive, ...others];
+
+    // Aplicar límites: Mínimo 3, Máximo 4
+    if (combined.length > 4) return combined.slice(0, 4);
+    if (combined.length < 3) return combined; 
+    return combined;
   }, [activeHabitsToday, habits, todayDay]);
 
   const visibleTasks = useMemo(() => {
-    const priorityOrder = { alta: 0, media: 1, baja: 2 };
+    const priorityOrder: Record<string, number> = { alta: 0, media: 1, baja: 2 };
     const sorted = tasks
       .filter(t => !t.completada)
-      .sort((a, b) => priorityOrder[a.prioridad || 'media'] - priorityOrder[b.prioridad || 'media']);
+      .sort((a, b) => (priorityOrder[a.prioridad || 'media'] ?? 1) - (priorityOrder[b.prioridad || 'media'] ?? 1));
     
-    // Mostrar entre 2 y 4.
-    if (sorted.length <= 4) return sorted;
-    return sorted.slice(0, 4);
+    // Entre 2 y 4
+    if (sorted.length > 4) return sorted.slice(0, 4);
+    // Si hay menos de 2, devolvemos lo que haya
+    return sorted;
   }, [tasks]);
 
   const recompensasDisponibles = useMemo(() => 

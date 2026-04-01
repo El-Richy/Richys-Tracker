@@ -122,13 +122,13 @@ export function JournalPage() {
             setFilter('journal');
           }
         }}
-        className="flex-1 min-h-[70vh] touch-pan-y"
+        className="flex-1 w-full touch-pan-y"
       >
         {/* Empty State */}
         {!isLoading && filteredEntries.length === 0 && (
           <motion.div 
             key={filter}
-            className="text-center py-20 px-6" 
+            className="flex flex-col items-center justify-center py-20 px-6 min-h-[50vh]" 
             initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }}
           >

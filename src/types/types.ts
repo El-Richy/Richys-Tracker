@@ -36,6 +36,8 @@ export interface HabitLog {
   subtareasCompletadas: string[];
   /** Razón opcional al romper racha */
   razonFallo?: string;
+  /** Timestamp ISO de la interacción */
+  timestamp?: string;
 }
 
 // ─── Racha ────────────────────────────────────────────────

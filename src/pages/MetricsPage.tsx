@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useChartData } from '../hooks/useChartData';
 import { useHabitStore } from '../store';
@@ -25,24 +25,30 @@ export function MetricsPage({ onBack }: MetricsPageProps) {
   const logs = useHabitStore((s) => s.logs);
 
   // Mejora 5: Mapa de calor de los últimos 35 días (5 semanas completas)
-  const heatmapData = Array.from({ length: 35 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (34 - i));
-    const dateStr = d.toISOString().split('T')[0];
-    const dayLogs = logs.filter(l => l.fecha === dateStr && l.completado);
-    return {
-      count: dayLogs.length,
-      date: d,
-      dateStr
-    };
-  });
+  const heatmapData = useMemo(() => {
+    return Array.from({ length: 35 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (34 - i));
+      const dateStr = d.toISOString().split('T')[0];
+      const dayLogs = logs.filter((l) => l.fecha === dateStr && l.completado);
+      return {
+        count: dayLogs.length,
+        date: d,
+        dateStr,
+      };
+    });
+  }, [logs]);
 
-  const maxCount = Math.max(...heatmapData.map(d => d.count), 1);
+  const maxCount = useMemo(() => {
+    return Math.max(...heatmapData.map((d: { count: number }) => d.count), 1);
+  }, [heatmapData]);
 
   // Últimas 5 entradas de puntos (más recientes primero)
-  const recentPoints = [...pointEntries]
-    .sort((a, b) => (a.fecha > b.fecha ? -1 : 1))
-    .slice(0, 5);
+  const recentPoints = useMemo(() => {
+    return [...pointEntries]
+      .sort((a, b) => (a.fecha > b.fecha ? -1 : 1))
+      .slice(0, 5);
+  }, [pointEntries]);
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-6 space-y-5">
@@ -102,7 +108,7 @@ export function MetricsPage({ onBack }: MetricsPageProps) {
         </h3>
         
         <div className="grid grid-cols-7 gap-1.5 aspect-[7/5]">
-          {heatmapData.map((day, idx) => {
+          {heatmapData.map((day: any, idx: number) => {
             const intensity = day.count / maxCount;
             let bgColor = 'bg-bg-elevated';
             if (day.count > 0) {
@@ -151,7 +157,7 @@ export function MetricsPage({ onBack }: MetricsPageProps) {
             ⭐ Puntos recientes
           </h3>
           <div className="space-y-2">
-            {recentPoints.map((entry) => (
+            {recentPoints.map((entry: any) => (
               <div
                 key={entry.id}
                 className="flex items-center justify-between text-xs"
