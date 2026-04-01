@@ -30,9 +30,11 @@ export function useRewards() {
     if (!user) return;
     setLoading(true);
     try {
+      // 1. Carga desde Dexie
       const localRewards = await db.rewards.where('userId').equals(user.id).toArray();
       setRewards(localRewards);
 
+      // 2. Sync desde Supabase (Maestro definitivo)
       const { data, error } = await supabase
         .from('rewards')
         .select('*')
@@ -40,6 +42,15 @@ export function useRewards() {
 
       if (!error && data) {
         const mapped = data.map(mapSupabaseReward);
+        const remoteIds = new Set(mapped.map(r => r.id));
+
+        // Limpiar en Dexie lo que ya no está en Supabase
+        const toDelete = localRewards.filter(lr => !remoteIds.has(lr.id)).map(lr => lr.id);
+        if (toDelete.length > 0) {
+          await db.rewards.bulkDelete(toDelete);
+        }
+
+        // Actualizar/Insertar los de Supabase
         await db.rewards.bulkPut(mapped);
         setRewards(mapped);
       }
@@ -84,11 +95,21 @@ export function useRewards() {
   }, [user, addRewardToStore]);
 
   const deleteReward = useCallback(async (id: string) => {
-    await db.rewards.delete(id);
-    removeRewardFromStore(id);
-    supabase.from('rewards').delete().eq('id', id).then(({ error }) => {
-      if (error) console.error('Sync delete reward error:', error.message);
-    });
+    try {
+      // 1. Borrar en Supabase primero (Confirmar con la nube)
+      const { error } = await supabase.from('rewards').delete().eq('id', id);
+      if (error) {
+        console.error('Error al borrar recompensa en Supabase:', error.message);
+      }
+
+      // 2. Dexie
+      await db.rewards.delete(id);
+
+      // 3. Store
+      removeRewardFromStore(id);
+    } catch (err) {
+      console.error('Local delete reward error:', err);
+    }
   }, [removeRewardFromStore]);
 
   const canjearReward = useCallback(async (id: string) => {

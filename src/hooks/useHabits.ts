@@ -241,7 +241,7 @@ export function useHabits() {
         if (error) console.error('Sync streak error:', error.message);
       });
 
-    // 2. Otorgar puntos (solo al completar, no al desmarcar)
+    // 2. Otorgar o quitar puntos
     if (completado) {
       // Verificar en Dexie si ya existe PointEntry base (10 pts) hoy
       const existeBase = await db.pointEntries
@@ -298,6 +298,34 @@ export function useHabits() {
             }
             syncPointEntry(entradaBonus);
           }
+        }
+      }
+    } else {
+      // AL DESMARCAR: Sistema Anti-Cheat
+      // Buscar la entrada de puntos de hoy para este hábito y borrarla
+      const entradasHoy = await db.pointEntries
+        .where('habitId')
+        .equals(habitId)
+        .filter(e => e.fecha === today && e.puntos > 0)
+        .toArray();
+
+      if (entradasHoy.length > 0) {
+        const ids = entradasHoy.map(e => e.id);
+        
+        // 1. Dexie
+        await db.pointEntries.bulkDelete(ids);
+        
+        // 2. Store (Remover y recalcular)
+        const currentEntries = useHabitStore.getState().pointEntries;
+        const remainingEntries = currentEntries.filter(e => !ids.includes(e.id));
+        setPointEntries(remainingEntries);
+        setTotalPoints(calcularTotalPuntos(remainingEntries));
+
+        // 3. Supabase Sync (Borrar entradas)
+        for (const id of ids) {
+          supabase.from('point_entries').delete().eq('id', id).then(({ error }) => {
+            if (error) console.error('Sync delete point entry error:', error.message);
+          });
         }
       }
     }
