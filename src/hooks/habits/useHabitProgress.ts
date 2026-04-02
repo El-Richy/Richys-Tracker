@@ -4,7 +4,6 @@ import { db } from '../../db';
 import { supabase } from '../../lib/supabase';
 import { getLocalDateStr } from '../../utils/dateUtils';
 import { generateId } from '../../utils/idUtils';
-import { useNotifications } from '../useNotifications';
 
 interface ProgressOptions {
   onPostCheck: (habitId: string, completado: boolean, fecha?: string) => Promise<void>;
@@ -20,8 +19,6 @@ export function useHabitProgress({ onPostCheck }: ProgressOptions) {
   const updateHabitStore = useHabitStore((s) => s.updateHabit);
   const user = useAuthStore((s) => s.user);
   const today = getLocalDateStr();
-  
-  const { clearHabitReminders, scheduleHabitReminder } = useNotifications();
 
   /**
    * Marcar o desmarcar un hábito.

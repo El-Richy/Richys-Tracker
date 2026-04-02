@@ -20,13 +20,7 @@ export function useRewards() {
   const { totalPoints, addPointEntry } = useHabitStore();
   const user = useAuthStore((s) => s.user);
 
-  useEffect(() => {
-    if (user) {
-      loadRewards();
-    }
-  }, [user]);
-
-  async function loadRewards() {
+  const loadRewards = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
@@ -59,7 +53,13 @@ export function useRewards() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [user, setLoading, setRewards]);
+
+  useEffect(() => {
+    if (user) {
+      loadRewards();
+    }
+  }, [user, loadRewards]);
 
   const createReward = useCallback(async (data: Pick<Reward, 'nombre' | 'descripcion' | 'icono' | 'precioPuntos' | 'esRecurrente'>) => {
     if (!user) return;
@@ -195,7 +195,20 @@ export function useRewards() {
   };
 }
 
-function mapSupabaseReward(row: any): Reward {
+interface SupabaseReward {
+  id: string;
+  user_id: string;
+  nombre: string;
+  descripcion: string;
+  icono: string;
+  precio_puntos: number;
+  canjeada: boolean;
+  es_recurrente: boolean;
+  ultimo_canjeo?: string;
+  creado_en: string;
+}
+
+function mapSupabaseReward(row: SupabaseReward): Reward {
   return {
     id: row.id,
     userId: row.user_id,

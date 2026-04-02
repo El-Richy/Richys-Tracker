@@ -32,7 +32,7 @@ export function useHabits() {
     if (habits.length > 0) {
       recalcularTodasLasRachas();
     }
-  }, [habits.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [habits.length, recalcularTodasLasRachas]);
 
   // 4. Helpers de UI / Selectores derivados
   const getLogForHabit = (habitId: string, fecha: string = getLocalDateStr()) => {
@@ -44,12 +44,14 @@ export function useHabits() {
   };
 
   const sortedHabits = useMemo(() => {
-    const orden = { alta: 1, media: 2, baja: 3 };
+    const orden: Record<string, number> = { alta: 1, media: 2, baja: 3 };
     return [...habits].sort((a, b) => {
-      const pA = orden[a.prioridad || 'media'];
-      const pB = orden[b.prioridad || 'media'];
+      const pA = orden[a.prioridad || 'media'] || 3;
+      const pB = orden[b.prioridad || 'media'] || 3;
       if (pA !== pB) return pA - pB;
-      return a.nombre.localeCompare(b.nombre);
+      const nDiff = (a.nombre || '').localeCompare(b.nombre || '');
+      if (nDiff !== 0) return nDiff;
+      return (a.id || '').localeCompare(b.id || '');
     });
   }, [habits]);
 

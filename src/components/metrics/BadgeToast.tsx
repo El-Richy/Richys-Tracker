@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useHabits } from '../../hooks/useHabits';
 import type { Badge } from '../../types';
@@ -10,6 +10,11 @@ import type { Badge } from '../../types';
 export function BadgeToast() {
   const { badges, confirmBadgeSeen } = useHabits();
   const [toastBadge, setToastBadge] = useState<Badge | null>(null);
+
+  const handleDismiss = useCallback((id: string) => {
+    setToastBadge(null);
+    confirmBadgeSeen(id);
+  }, [confirmBadgeSeen]);
 
   useEffect(() => {
     // Buscamos el primer badge que NO haya sido visto aún
@@ -25,12 +30,7 @@ export function BadgeToast() {
 
       return () => clearTimeout(timer);
     }
-  }, [badges, toastBadge]);
-
-  const handleDismiss = (id: string) => {
-    setToastBadge(null);
-    confirmBadgeSeen(id);
-  };
+  }, [badges, toastBadge, handleDismiss]);
 
   return (
     <AnimatePresence>

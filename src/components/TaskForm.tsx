@@ -55,7 +55,7 @@ export function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
     if (!newSubtask.trim()) return;
     setSubtareas((prev) => [
       ...prev,
-      { id: generateId(), nombre: newSubtask.trim(), completada: false } as any,
+      { id: generateId(), nombre: newSubtask.trim(), completada: false },
     ]);
     setNewSubtask('');
   }
@@ -115,7 +115,7 @@ export function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
                 <label className="block text-sm text-text-secondary mb-1.5">Prioridad</label>
                 <select
                   value={prioridad}
-                  onChange={(e) => setPrioridad(e.target.value as any)}
+                  onChange={(e) => setPrioridad(e.target.value as 'alta' | 'media' | 'baja')}
                   className="w-full px-4 py-3 rounded-lg bg-bg-primary border border-border text-text-primary focus:border-accent outline-none"
                 >
                   <option value="alta">Alta 🔴</option>

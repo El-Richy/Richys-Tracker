@@ -43,17 +43,9 @@ export function useJournal() {
 
   const user = useAuthStore((s) => s.user);
 
-  // ─── Cargar datos al montar ────────────────────────────────
-
-  useEffect(() => {
-    if (user) {
-      loadEntries();
-    }
-  }, [user]);
-
   // ─── Loaders ───────────────────────────────────────────────
 
-  async function loadEntries() {
+  const loadEntries = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
@@ -93,7 +85,15 @@ export function useJournal() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [user, setLoading, setEntries]);
+
+  // ─── Cargar datos al montar ────────────────────────────────
+
+  useEffect(() => {
+    if (user) {
+      loadEntries();
+    }
+  }, [user, loadEntries]);
 
   // ─── CRUD ──────────────────────────────────────────────────
 
@@ -177,7 +177,7 @@ export function useJournal() {
    const editEntry = useCallback(async (id: string, data: Partial<JournalEntry>) => {
     if (!user) return;
 
-    const updates: any = { ...data };
+    const updates: Partial<JournalEntry> = { ...data };
     if (data.fotos) {
       // Solo comprimir las que son nuevas (base64 recién capturado)
       updates.fotos = await Promise.all(
@@ -236,16 +236,26 @@ export function useJournal() {
   };
 }
 
-
 // ─── Mapper ───────────────────────────────────────────────
 
-function mapSupabaseJournalEntry(row: any): JournalEntry {
+interface SupabaseJournalEntry {
+  id: string;
+  user_id: string;
+  titulo?: string;
+  texto: string;
+  estado_animo?: number;
+  fotos?: string[];
+  creado_en: string;
+  tipo?: 'journal' | 'note';
+}
+
+function mapSupabaseJournalEntry(row: SupabaseJournalEntry): JournalEntry {
   return {
     id: row.id,
     userId: row.user_id,
-    titulo: row.titulo || undefined,
+    titulo: row.titulo,
     texto: row.texto,
-    estadoAnimo: row.estado_animo || undefined,
+    estadoAnimo: row.estado_animo as 1 | 2 | 3 | 4 | 5 | undefined,
     fotos: row.fotos || [],
     creadoEn: row.creado_en,
     tipo: row.tipo || 'journal',

@@ -228,7 +228,7 @@ export function HabitForm({ habit, onSubmit, onClose }: HabitFormProps) {
                   <button
                     key={p.value}
                     type="button"
-                    onClick={() => setPrioridad(p.value as any)}
+                    onClick={() => setPrioridad(p.value as 'alta' | 'media' | 'baja')}
                     className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all border ${
                       prioridad === p.value 
                         ? `${p.color} shadow-sm scale-[1.02]` 

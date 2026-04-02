@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useHabitStore, useAuthStore } from '../../store';
 import { db } from '../../db';
 import { supabase } from '../../lib/supabase';
-import type { Habit, PointEntry } from '../../types';
+import type { Habit, PointEntry, Subtarea } from '../../types';
 import { calcularTotalPuntos } from '../../utils/pointsEngine';
 import { getLocalDateStr } from '../../utils/dateUtils';
 import { useNotifications } from '../useNotifications';
@@ -125,8 +125,8 @@ export function useHabitSync() {
         setTotalPoints(calcularTotalPuntos(mapped));
       }
 
-    } catch (err: any) {
-      if (err.name !== 'AbortError') {
+    } catch (err) {
+      if (err instanceof Error && err.name !== 'AbortError') {
         console.error('Sync error:', err);
       }
     }
@@ -137,13 +137,27 @@ export function useHabitSync() {
 
 // ─── Mappers ──────────────────────────────────────────────
 
-function mapSupabaseHabit(row: any): Habit {
+interface SupabaseHabit {
+  id: string;
+  nombre: string;
+  color: string;
+  icono: string;
+  recordatorio_hora: string | null;
+  dias_activos: number[];
+  dias_gracia: number;
+  creado_en: string;
+  user_id: string;
+  subtareas: Subtarea[];
+  prioridad: 'alta' | 'media' | 'baja';
+}
+
+function mapSupabaseHabit(row: SupabaseHabit): Habit {
   return {
     id: row.id,
     nombre: row.nombre,
     color: row.color,
     icono: row.icono,
-    recordatorioHora: row.recordatorio_hora ?? null,
+    recordatorioHora: row.recordatorio_hora,
     diasActivos: row.dias_activos || [],
     diasGracia: row.dias_gracia ?? 0,
     creadoEn: row.creado_en,
@@ -153,7 +167,16 @@ function mapSupabaseHabit(row: any): Habit {
   };
 }
 
-function mapSupabasePointEntry(row: any): PointEntry {
+interface SupabasePointEntry {
+  id: string;
+  user_id: string;
+  habit_id: string | null;
+  creado_en: string;
+  puntos: number;
+  razon: string;
+}
+
+function mapSupabasePointEntry(row: SupabasePointEntry): PointEntry {
   return {
     id: row.id,
     userId: row.user_id,

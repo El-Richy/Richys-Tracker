@@ -25,7 +25,7 @@ export function TasksPage() {
 
   useEffect(() => {
     loadTasks();
-  }, []);
+  }, [loadTasks]);
 
   const pendingTasks = tasks.filter(t => !t.completada);
   const completedTasks = tasks.filter(t => t.completada);

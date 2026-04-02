@@ -3,7 +3,7 @@ import { useTaskStore } from '../store/taskStore';
 import { useAuthStore } from '../store';
 import { db } from '../db';
 import { supabase } from '../lib/supabase';
-import { Task } from '../types';
+import { Task, Subtarea } from '../types';
 import { generateId } from '../utils/idUtils';
 import { useNotifications } from './useNotifications';
 
@@ -26,17 +26,9 @@ export function useTasks() {
 
   const user = useAuthStore((s) => s.user);
 
-  // ─── Cargar datos al montar ────────────────────────────────
-
-  useEffect(() => {
-    if (user) {
-      loadTasks();
-    }
-  }, [user]);
-
   // ─── Loaders ───────────────────────────────────────────────
 
-  async function loadTasks() {
+  const loadTasks = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
@@ -76,7 +68,15 @@ export function useTasks() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [user, setLoading, setTasks, scheduleTaskReminder]);
+
+  // ─── Cargar datos al montar ────────────────────────────────
+
+  useEffect(() => {
+    if (user) {
+      loadTasks();
+    }
+  }, [user, loadTasks]);
 
   // ─── CRUD ──────────────────────────────────────────────────
 
@@ -128,7 +128,7 @@ export function useTasks() {
     // 2. Store
     updateTaskInStore(id, updates);
     // 3. Supabase Sync
-    const sbUpdates: any = {};
+    const sbUpdates: Record<string, unknown> = {};
     if (updates.titulo !== undefined) sbUpdates.titulo = updates.titulo;
     if (updates.descripcion !== undefined) sbUpdates.descripcion = updates.descripcion;
     if (updates.completada !== undefined) sbUpdates.completada = updates.completada;
@@ -247,16 +247,27 @@ export function useTasks() {
   };
 }
 
-// ─── Mapper ───────────────────────────────────────────────
+interface SupabaseTask {
+  id: string;
+  user_id: string;
+  titulo: string;
+  descripcion: string | null;
+  completada: boolean;
+  prioridad: 'alta' | 'media' | 'baja';
+  deadline: string | null;
+  recordatorio_hora: string | null;
+  subtareas: Subtarea[];
+  creado_en: string;
+}
 
-function mapSupabaseTask(row: any): Task {
+function mapSupabaseTask(row: SupabaseTask): Task {
   return {
     id: row.id,
     userId: row.user_id,
     titulo: row.titulo,
     descripcion: row.descripcion || '',
     completada: row.completada,
-    prioridad: row.prioridad as Task['prioridad'],
+    prioridad: row.prioridad,
     deadline: row.deadline || undefined,
     recordatorioHora: row.recordatorio_hora || undefined,
     subtareas: row.subtareas || [],

@@ -10,7 +10,6 @@ import type { Habit } from '../types';
  */
 export function HabitsPage() {
   const {
-    habits,
     isLoading,
     createHabit,
     editHabit,
@@ -19,6 +18,7 @@ export function HabitsPage() {
     toggleSubtask,
     addSubtask,
     getLogForHabit,
+    sortedHabits,
   } = useHabits();
 
   const [showForm, setShowForm] = useState(false);
@@ -60,21 +60,21 @@ export function HabitsPage() {
           Mis hábitos
         </h1>
         <p className="text-sm text-text-secondary mt-1">
-          {habits.length === 0
+          {sortedHabits.length === 0
             ? 'Crea tu primer hábito para empezar'
-            : `${habits.length} hábito${habits.length !== 1 ? 's' : ''} activo${habits.length !== 1 ? 's' : ''}`}
+            : `${sortedHabits.length} hábito${sortedHabits.length !== 1 ? 's' : ''} activo${sortedHabits.length !== 1 ? 's' : ''}`}
         </p>
       </div>
 
       {/* Loading */}
-      {isLoading && habits.length === 0 && (
+      {isLoading && sortedHabits.length === 0 && (
         <div className="text-center py-12 text-text-secondary">
           Cargando hábitos...
         </div>
       )}
 
       {/* Empty state */}
-      {!isLoading && habits.length === 0 && (
+      {!isLoading && sortedHabits.length === 0 && (
         <motion.div
           className="text-center py-16"
           initial={{ opacity: 0 }}
@@ -91,7 +91,7 @@ export function HabitsPage() {
       {/* Habit list */}
       <div className="space-y-3">
         <AnimatePresence>
-          {habits.map((habit, i) => (
+          {sortedHabits.map((habit, i) => (
             <HabitCard
               key={habit.id}
               index={i}

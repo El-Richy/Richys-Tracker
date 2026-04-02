@@ -108,7 +108,7 @@ export function MetricsPage({ onBack }: MetricsPageProps) {
         </h3>
         
         <div className="grid grid-cols-7 gap-1.5 aspect-[7/5]">
-          {heatmapData.map((day: any, idx: number) => {
+          {heatmapData.map((day, idx) => {
             const intensity = day.count / maxCount;
             let bgColor = 'bg-bg-elevated';
             if (day.count > 0) {
@@ -157,7 +157,7 @@ export function MetricsPage({ onBack }: MetricsPageProps) {
             ⭐ Puntos recientes
           </h3>
           <div className="space-y-2">
-            {recentPoints.map((entry: any) => (
+            {heatmapData.length > 0 && recentPoints.map((entry) => (
               <div
                 key={entry.id}
                 className="flex items-center justify-between text-xs"

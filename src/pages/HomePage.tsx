@@ -8,7 +8,7 @@ import { JournalForm } from '../components/JournalForm';
 import { JournalDetailModal } from '../components/JournalDetailModal';
 import { type TabId } from '../components/TabBar';
 import { supabase } from '../lib/supabase';
-import type { Habit } from '../types';
+import type { Habit, JournalEntry } from '../types';
 import { useRewards } from '../hooks/useRewards';
 import { QuickNoteModal } from '../components/QuickNoteModal';
 
@@ -33,12 +33,10 @@ const MOOD_EMOJIS: Record<number, string> = {
   5: '😄',
 };
 
-// MOODS removidos de esta sección (se manejan en JournalForm)
-
 export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
   const user = useAuthStore((s) => s.user);
   const { habits, totalPoints, toggleCheck, getLogForHabit } = useHabits();
-  const { tasks, toggleTask } = useTasks();
+  const { tasks, toggleTask, loadTasks } = useTasks();
   const { createEntry, getRecuerdoDeHoy } = useJournal();
   const { rewards, estaDisponible } = useRewards();
 
@@ -46,7 +44,7 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
   const [motivator, setMotivator] = useState('');
   const [showJournalForm, setShowJournalForm] = useState(false);
   const [showQuickNoteForm, setShowQuickNoteForm] = useState(false);
-  const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [autoOpenCamera, setAutoOpenCamera] = useState(false);
 
   const [displayName, setDisplayName] = useState<string | null>(null);
@@ -71,6 +69,12 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
       setShowNameModal(true);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      loadTasks();
+    }
+  }, [user, loadTasks]);
 
   const showToast = useUiStore((s) => s.showToast);
 
@@ -122,23 +126,27 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
   const visibleHabits = useMemo(() => {
     const priorityOrder: Record<string, number> = { alta: 0, media: 1, baja: 2 };
     
-    // 1. Obtener hábitos activos hoy
-    const dailyActive = [...activeHabitsToday].sort((a, b) => 
-      (priorityOrder[a.prioridad || 'media'] ?? 1) - (priorityOrder[b.prioridad || 'media'] ?? 1)
-    );
+    const dailyActive = [...activeHabitsToday].sort((a, b) => {
+      const pDiff = (priorityOrder[a.prioridad || 'media'] ?? 1) - (priorityOrder[b.prioridad || 'media'] ?? 1);
+      if (pDiff !== 0) return pDiff;
+      const nDiff = (a.nombre || '').localeCompare(b.nombre || '');
+      if (nDiff !== 0) return nDiff;
+      return (a.id || '').localeCompare(b.id || '');
+    });
 
-    // 2. Obtener el resto de hábitos
     const others = habits
       .filter(h => !h.diasActivos.includes(todayDay))
-      .sort((a, b) => (priorityOrder[a.prioridad || 'media'] ?? 1) - (priorityOrder[b.prioridad || 'media'] ?? 1));
+      .sort((a, b) => {
+        const pDiff = (priorityOrder[a.prioridad || 'media'] ?? 1) - (priorityOrder[b.prioridad || 'media'] ?? 1);
+        if (pDiff !== 0) return pDiff;
+        const nDiff = (a.nombre || '').localeCompare(b.nombre || '');
+        if (nDiff !== 0) return nDiff;
+        return (a.id || '').localeCompare(b.id || '');
+      });
 
-    // Unir priorizando los de hoy
-    let combined = [...dailyActive, ...others];
+    const combined = [...dailyActive, ...others];
 
-    // Aplicar límites: Mínimo 3, Máximo 4
-    if (combined.length > 4) return combined.slice(0, 4);
-    if (combined.length < 3) return combined; 
-    return combined;
+    return combined.slice(0, 4);
   }, [activeHabitsToday, habits, todayDay]);
 
   const visibleTasks = useMemo(() => {
@@ -147,20 +155,13 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
       .filter(t => !t.completada)
       .sort((a, b) => (priorityOrder[a.prioridad || 'media'] ?? 1) - (priorityOrder[b.prioridad || 'media'] ?? 1));
     
-    // Entre 2 y 4
     if (sorted.length > 4) return sorted.slice(0, 4);
-    // Si hay menos de 2, devolvemos lo que haya
     return sorted;
   }, [tasks]);
 
   const recompensasDisponibles = useMemo(() => 
     rewards.filter(r => estaDisponible(r)).slice(0, 2)
   , [rewards, estaDisponible]);
-
-  
-  // ultimoRegistro removido
-
-  // Handlers removidos: ya no hay selección de humor rápida en Home
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-6 pb-12 space-y-8 overflow-x-hidden">

@@ -27,7 +27,7 @@ export function JournalPage() {
 
   useEffect(() => {
     loadEntries();
-  }, []);
+  }, [loadEntries]);
 
   function handleFormSubmit(data: JournalFormData) {
     if (editingEntry) {
@@ -86,21 +86,18 @@ export function JournalPage() {
 
       {/* Filtros */}
       <div className="flex gap-2 mb-8 bg-bg-card p-1 rounded-2xl border border-border sticky top-0 z-10">
-        {[
-          { id: 'journal', label: 'Diario', icon: '📓' },
-          { id: 'note', label: 'Notas', icon: '📝' },
-        ].map((f) => (
+        {(['journal', 'note'] as const).map((f) => (
           <button
-            key={f.id}
-            onClick={() => setFilter(f.id as any)}
+            key={f}
+            onClick={() => setFilter(f)}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              filter === f.id 
+              filter === f 
                 ? 'bg-accent text-white shadow-lg shadow-accent/20' 
                 : 'text-text-secondary hover:text-text-primary'
             }`}
           >
-            <span>{f.icon}</span>
-            <span>{f.label}</span>
+            <span>{f === 'journal' ? '📓' : '📝'}</span>
+            <span>{f === 'journal' ? 'Diario' : 'Notas'}</span>
           </button>
         ))}
       </div>

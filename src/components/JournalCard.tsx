@@ -140,7 +140,7 @@ export function JournalCard({ entry, index = 0, onDelete, onEdit, onOpen, onEmbe
                   <button
                     key={m}
                     onClick={() => {
-                      onEmbed?.(m as any);
+                      onEmbed?.(m as 1 | 2 | 3 | 4 | 5);
                       setShowMoodPicker(false);
                     }}
                     className="text-3xl p-2 hover:bg-bg-elevated rounded-xl transition-transform active:scale-90"
@@ -161,9 +161,9 @@ export function JournalCard({ entry, index = 0, onDelete, onEdit, onOpen, onEmbe
 
         {/* Título y Texto */}
         <div className="relative">
-          {(entry as any).titulo && (
+          {entry.titulo && (
             <h4 className="text-sm font-bold text-text-primary mb-1">
-              {(entry as any).titulo}
+              {entry.titulo}
             </h4>
           )}
           <p

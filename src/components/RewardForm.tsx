@@ -2,7 +2,13 @@ import { useState, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface RewardFormProps {
-  onSubmit: (data: any) => void;
+  onSubmit: (data: { 
+    nombre: string; 
+    descripcion: string; 
+    precioPuntos: number; 
+    icono: string; 
+    esRecurrente: boolean; 
+  }) => void;
   onClose: () => void;
 }
 

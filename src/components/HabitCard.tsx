@@ -65,7 +65,7 @@ export function HabitCard({
         dia: diaNombre
       };
     });
-  }, [logs, habit.id]);
+  }, [logs]);
 
   return (
     <motion.div
@@ -106,7 +106,7 @@ export function HabitCard({
 
           {/* Mejora 5: Racha semanal (últimos 7 días) — distribuido */}
           <div className="flex justify-between items-center mt-3 px-1 border-t border-border pt-2">
-            {last7Days.map((day: any, i: number) => (
+            {last7Days.map((day: { completado: boolean; dia: string; }, i: number) => (
               <div key={i} className="flex flex-col items-center gap-1">
                 <div className={`w-2.5 h-2.5 rounded-full ${
                   day.completado ? 'bg-accent shadow-[0_0_8px_rgba(240,97,26,0.3)]' : 'bg-bg-elevated'

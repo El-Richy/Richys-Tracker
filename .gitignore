@@ -17,3 +17,6 @@ dist-ssr
 
 # Environment
 .env
+
+# Vite
+.vite/

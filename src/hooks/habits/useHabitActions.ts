@@ -85,7 +85,7 @@ export function useHabitActions() {
     }
 
     // 2. Supabase en background
-    const up: any = {};
+    const up: Record<string, unknown> = {};
     if (updates.nombre) up.nombre = updates.nombre;
     if (updates.color) up.color = updates.color;
     if (updates.icono) up.icono = updates.icono;
