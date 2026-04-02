@@ -13,7 +13,7 @@ import { useNotifications } from './hooks/useNotifications';
  */
 function App() {
   const { user, isLoading, initialize } = useAuthStore();
-  const { requestPermission } = useNotifications();
+  const { requestPermission, clearAllReminders } = useNotifications();
 
   useEffect(() => {
     initialize();
@@ -24,10 +24,9 @@ function App() {
       requestPermission();
     } else {
       // Limpiar todo al cerrar sesión para evitar fugas de memoria y notificaciones fantasma
-      const { clearAllReminders } = useNotifications();
       clearAllReminders();
     }
-  }, [user, requestPermission]);
+  }, [user, requestPermission, clearAllReminders]);
 
   if (isLoading && !user) {
     return <SplashScreen />;
