@@ -81,17 +81,20 @@ export function useHabitImpact() {
     await db.streaks.put(nuevaRacha);
 
     // Sync racha a Supabase
-    supabase.from('streaks').upsert({
-      habit_id: nuevaRacha.habitId,
-      user_id: user.id,
-      racha_actual: nuevaRacha.rachaActual,
-      racha_maxima: nuevaRacha.rachaMaxima,
-      ultimo_check: nuevaRacha.ultimoCheck || null,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'habit_id,user_id' })
-    .then(({ error }) => {
-      if (error) console.error('Sync streak error:', error.message);
-    });
+    try {
+      const { error } = await supabase.from('streaks').upsert({
+        habit_id: nuevaRacha.habitId,
+        user_id: user.id,
+        racha_actual: nuevaRacha.rachaActual,
+        racha_maxima: nuevaRacha.rachaMaxima,
+        ultimo_check: nuevaRacha.ultimoCheck || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'habit_id,user_id' });
+      
+      if (error) throw error;
+    } catch (err) {
+      console.error('[Sync] Error sincronizando racha:', err);
+    }
 
     // 2. Gestionar Puntos
     if (completado) {

@@ -22,6 +22,10 @@ function App() {
   useEffect(() => {
     if (user) {
       requestPermission();
+    } else {
+      // Limpiar todo al cerrar sesión para evitar fugas de memoria y notificaciones fantasma
+      const { clearAllReminders } = useNotifications();
+      clearAllReminders();
     }
   }, [user, requestPermission]);
 

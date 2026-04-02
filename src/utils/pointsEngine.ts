@@ -61,37 +61,41 @@ export function calcularTotalPuntos(entries: PointEntry[]): number {
 /**
  * Sincroniza una entrada de puntos con Supabase.
  */
-export function syncPointEntry(entry: PointEntry) {
-  supabase.from('point_entries').insert({
-    id: entry.id,
-    user_id: entry.userId,
-    habit_id: entry.habitId,
-    puntos: entry.puntos,
-    razon: entry.razon,
-    creado_en: entry.fecha,
-  })
-  .then(({ error }) => {
-    if (error) console.error('Sync point entry error:', error.message);
-  });
+export async function syncPointEntry(entry: PointEntry) {
+  try {
+    const { error } = await supabase.from('point_entries').insert({
+      id: entry.id,
+      user_id: entry.userId,
+      habit_id: entry.habitId,
+      puntos: entry.puntos,
+      razon: entry.razon,
+      creado_en: entry.fecha,
+    });
+    
+    if (error) {
+      console.error(`[Sync] Error insertando puntos (${entry.id}):`, error.message);
+    }
+  } catch (err) {
+    console.error(`[Sync] Error de red al sincronizar puntos:`, err);
+  }
 }
 
 /**
  * Sistema Anti-Cheat: Borra puntos otorgados hoy para un hábito específico.
  * Se usa al desmarcar un hábito o fallar una racha retrospectivamente.
+ * Optimizado con índice compuesto [habitId+fecha].
  */
 export async function borrarPuntosDeHoy(habitId: string, fecha: string) {
   try {
-    // Normalizar fecha para comparación (10 chars: YYYY-MM-DD)
+    // Normalizar fecha (YYYY-MM-DD)
     const normalizedFecha = fecha.slice(0, 10);
     
-    // 1. Buscar en Dexie con filtro resiliente
+    // 1. Buscar en Dexie usando índice compuesto (O(log n) vs O(n))
     const entradasHoy = await db.pointEntries
-      .where('habitId')
-      .equals(habitId)
-      .filter(e => e.fecha.startsWith(normalizedFecha) && e.puntos > 0)
+      .where('[habitId+fecha]')
+      .equals([habitId, normalizedFecha])
+      .filter(e => e.puntos > 0)
       .toArray();
-
-    console.log(`[Anti-Cheat] Entradas encontradas para borrar (${habitId}):`, entradasHoy.length);
 
     if (entradasHoy.length === 0) return;
 
@@ -108,14 +112,19 @@ export async function borrarPuntosDeHoy(habitId: string, fecha: string) {
     store.setPointEntries(remainingEntries);
     store.setTotalPoints(calcularTotalPuntos(remainingEntries));
 
-    // 4. Supabase Sync
-    for (const id of ids) {
+    // 4. Supabase Sync con Promise.allSettled para robustez
+    const syncDeletes = ids.map(id => 
       supabase.from('point_entries').delete().eq('id', id)
-        .then(({ error }) => {
-          if (error) console.error('Sync delete point error:', error.message);
-        });
-    }
+    );
+    
+    const results = await Promise.allSettled(syncDeletes);
+    results.forEach((res, idx) => {
+      if (res.status === 'rejected' || (res.value as any).error) {
+        console.error(`[Anti-Cheat] Error al sincronizar borrado de punto ${ids[idx]}`);
+      }
+    });
+
   } catch (err) {
-    console.error('Anti-cheat system error:', err);
+    console.error('Anti-cheat system error critical:', err);
   }
 }

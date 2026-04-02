@@ -86,6 +86,19 @@ export class TrackerDB extends Dexie {
       journalEntries: 'id, userId, creadoEn',
       rewards: 'id, userId, canjeada, esRecurrente',
     });
+
+    // v7: añade índice compuesto [habitId+fecha] en pointEntries para el sistema anti-cheat
+    this.version(7).stores({
+      habits: 'id, userId, nombre',
+      habitLogs: 'id, habitId, fecha, [habitId+fecha]',
+      streaks: 'habitId',
+      points: 'userId',
+      badges: 'id',
+      pointEntries: 'id, userId, habitId, fecha, [habitId+fecha]',
+      tasks: 'id, userId, completada, prioridad',
+      journalEntries: 'id, userId, creadoEn',
+      rewards: 'id, userId, canjeada, esRecurrente',
+    });
   }
 }
 

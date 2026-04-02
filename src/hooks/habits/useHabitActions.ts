@@ -46,22 +46,26 @@ export function useHabitActions() {
     scheduleHabitReminder(habit);
 
     // 2. Supabase en background
-    supabase.from('habits').insert({
-      id: habit.id,
-      user_id: habit.userId,
-      nombre: habit.nombre,
-      color: habit.color,
-      icono: habit.icono,
-      recordatorio_hora: habit.recordatorioHora,
-      dias_activos: habit.diasActivos,
-      dias_gracia: habit.diasGracia,
-      subtareas: habit.subtareas,
-      creado_en: habit.creadoEn,
-      prioridad: habit.prioridad,
-    })
-      .then(({ error }) => {
-        if (error) console.error('Sync create habit error:', error.message);
+    try {
+      const { error } = await supabase.from('habits').insert({
+        id: habit.id,
+        user_id: habit.userId,
+        nombre: habit.nombre,
+        color: habit.color,
+        icono: habit.icono,
+        recordatorio_hora: habit.recordatorioHora,
+        dias_activos: habit.diasActivos,
+        dias_gracia: habit.diasGracia,
+        subtareas: habit.subtareas,
+        creado_en: habit.creadoEn,
+        prioridad: habit.prioridad,
       });
+      
+      if (error) throw error;
+    } catch (err) {
+      console.error('[Sync] Error creando hábito en Supabase:', err);
+      // Aquí se podría implementar una cola de reintentos
+    }
 
     return habit;
   }, [user, addHabitToStore, scheduleHabitReminder]);
@@ -85,22 +89,25 @@ export function useHabitActions() {
     }
 
     // 2. Supabase en background
-    const up: Record<string, unknown> = {};
-    if (updates.nombre) up.nombre = updates.nombre;
-    if (updates.color) up.color = updates.color;
-    if (updates.icono) up.icono = updates.icono;
-    if (updates.recordatorioHora !== undefined) up.recordatorio_hora = updates.recordatorioHora;
-    if (updates.diasActivos) up.dias_activos = updates.diasActivos;
-    if (updates.diasGracia !== undefined) up.dias_gracia = updates.diasGracia;
-    if (updates.subtareas) up.subtareas = updates.subtareas;
-    if (updates.prioridad !== undefined) up.prioridad = updates.prioridad;
+    try {
+      const up: Record<string, unknown> = {};
+      if (updates.nombre) up.nombre = updates.nombre;
+      if (updates.color) up.color = updates.color;
+      if (updates.icono) up.icono = updates.icono;
+      if (updates.recordatorioHora !== undefined) up.recordatorio_hora = updates.recordatorioHora;
+      if (updates.diasActivos) up.dias_activos = updates.diasActivos;
+      if (updates.diasGracia !== undefined) up.dias_gracia = updates.diasGracia;
+      if (updates.subtareas) up.subtareas = updates.subtareas;
+      if (updates.prioridad !== undefined) up.prioridad = updates.prioridad;
 
-    supabase.from('habits')
-      .update(up)
-      .eq('id', id)
-      .then(({ error }) => {
-        if (error) console.error('Sync update habit error:', error.message);
-      });
+      const { error } = await supabase.from('habits')
+        .update(up)
+        .eq('id', id);
+        
+      if (error) throw error;
+    } catch (err) {
+      console.error('[Sync] Error actualizando hábito en Supabase:', err);
+    }
   }, [updateHabitInStore, clearHabitReminders, scheduleHabitReminder]);
 
   /**

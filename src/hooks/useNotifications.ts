@@ -21,6 +21,7 @@ export function useNotifications() {
   }, []);
 
   const clearAllReminders = useCallback(() => {
+    console.log('[Notifications] Limpiando TODOS los recordatorios activos...');
     activeTimeouts.forEach((timeouts) => {
       timeouts.forEach((id) => window.clearTimeout(id));
     });
