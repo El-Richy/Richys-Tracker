@@ -12,7 +12,9 @@ import {
 import { evaluarBadges } from '../../utils/badges';
 import { scheduleRiskReminder } from '../../lib/notifications';
 
-const MAX_LOG_DAYS = 90;
+// Must cover calcularRacha's 365-day walk. A shorter window rewrites a
+// longer streak as broken on the next check.
+const MAX_LOG_DAYS = 365;
 
 export function useHabitImpact() {
   const user = useAuthStore((s) => s.user);
