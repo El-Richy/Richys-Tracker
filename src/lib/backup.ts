@@ -10,6 +10,7 @@ import type {
   Task,
 } from '../types';
 import { db } from '../db';
+import { validateBackupRecord } from './backupValidate';
 
 export const BACKUP_VERSION = '2.0.0';
 export const MAX_IMPORT_BYTES = 25 * 1024 * 1024;
@@ -127,18 +128,8 @@ export function parseBackupJson(text: string): BackupPayload {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error('invalid_shape');
   }
-  const data = parsed as Record<string, unknown>;
-  let hasRows = false;
-  for (const key of COLLECTION_KEYS) {
-    if (data[key] === undefined) continue;
-    if (!Array.isArray(data[key])) throw new Error('invalid_shape');
-    if ((data[key] as unknown[]).length > 0) hasRows = true;
-  }
-  if (data.usuario !== undefined) {
-    if (!data.usuario || typeof data.usuario !== 'object' || Array.isArray(data.usuario)) {
-      throw new Error('invalid_shape');
-    }
-  }
+  const data = validateBackupRecord(parsed as Record<string, unknown>);
+  const hasRows = COLLECTION_KEYS.some((key) => data[key].length > 0);
   if (!hasRows) throw new Error('empty_backup');
   return data as unknown as BackupPayload;
 }

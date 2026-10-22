@@ -82,7 +82,10 @@ export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageP
     });
 
     if (data.usuario) {
-      await updateProfile(data.usuario);
+      await updateProfile({
+        displayName: data.usuario.displayName,
+        accentColor: data.usuario.accentColor,
+      });
     }
   }
 
