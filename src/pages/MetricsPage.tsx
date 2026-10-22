@@ -157,7 +157,7 @@ export function MetricsPage({ onBack }: MetricsPageProps) {
             ⭐ Puntos recientes
           </h3>
           <div className="space-y-2">
-            {heatmapData.length > 0 && recentPoints.map((entry) => (
+            {recentPoints.length > 0 && recentPoints.map((entry) => (
               <div
                 key={entry.id}
                 className="flex items-center justify-between text-xs"

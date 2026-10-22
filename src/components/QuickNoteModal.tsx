@@ -26,6 +26,7 @@ export function QuickNoteModal({ onSubmit, onClose }: QuickNoteModalProps) {
   return (
     <AnimatePresence>
       <motion.div
+        data-no-swipe
         className="fixed inset-0 bg-black/80 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

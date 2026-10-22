@@ -1,20 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useAuthStore, useUiStore } from '../store';
 import { useHabits } from '../hooks/useHabits';
 import { useTasks } from '../hooks/useTasks';
 import { useJournal } from '../hooks/useJournal';
-import { JournalForm } from '../components/JournalForm';
 import { JournalDetailModal } from '../components/JournalDetailModal';
 import { type TabId } from '../components/TabBar';
-import { supabase } from '../lib/supabase';
 import type { Habit, JournalEntry } from '../types';
-import { useRewards } from '../hooks/useRewards';
-import { QuickNoteModal } from '../components/QuickNoteModal';
 
 interface HomePageProps {
   onNavigate: (tab: TabId) => void;
-  onNavigateToRewards: () => void;
 }
 
 const MOTIVADORES = [
@@ -33,23 +28,16 @@ const MOOD_EMOJIS: Record<number, string> = {
   5: '😄',
 };
 
-export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
+export function HomePage({ onNavigate }: HomePageProps) {
   const user = useAuthStore((s) => s.user);
-  const { habits, totalPoints, toggleCheck, getLogForHabit } = useHabits();
-  const { tasks, toggleTask, loadTasks } = useTasks();
-  const { createEntry, getRecuerdoDeHoy } = useJournal();
-  const { rewards, estaDisponible } = useRewards();
+  const { habits, toggleCheck, getLogForHabit } = useHabits();
+  const { tasks, toggleTask } = useTasks();
+  const { getRecuerdoDeHoy } = useJournal();
 
   const [greeting, setGreeting] = useState('');
   const [motivator, setMotivator] = useState('');
-  const [showJournalForm, setShowJournalForm] = useState(false);
-  const [showQuickNoteForm, setShowQuickNoteForm] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
-  const [autoOpenCamera, setAutoOpenCamera] = useState(false);
-
-  const [displayName, setDisplayName] = useState<string | null>(null);
-  const [showNameModal, setShowNameModal] = useState(false);
-  const [tempName, setTempName] = useState('');
+  const openQuickAction = useUiStore((s) => s.openQuickAction);
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -58,74 +46,35 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
     else setGreeting('Buenas noches');
 
     setMotivator(MOTIVADORES[Math.floor(Math.random() * MOTIVADORES.length)]);
+  }, []);
 
-    const stored = localStorage.getItem('displayName');
-    const meta = user?.user_metadata?.display_name;
-    const finalName = stored || meta || null;
-
-    if (finalName) {
-      setDisplayName(finalName);
-    } else {
-      setShowNameModal(true);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (user) {
-      loadTasks();
-    }
-  }, [user, loadTasks]);
-
-  const showToast = useUiStore((s) => s.showToast);
-
-  const handleSaveName = async () => {
-    if (!tempName.trim()) return;
-    const name = tempName.trim();
-    
-    try {
-      localStorage.setItem('displayName', name);
-      setDisplayName(name);
-      setShowNameModal(false);
-
-      const { error } = await supabase.auth.updateUser({
-        data: { display_name: name }
-      });
-
-      if (error) throw error;
-      showToast('¡Nombre guardado!', 'success');
-    } catch (error) {
-      console.error('Error saving name:', error);
-      showToast('Error al guardar el nombre', 'error');
-    }
-  };
-
-  const nombreUsuario = displayName || 'tú';
-  const fechaHoyStr = new Date().toLocaleDateString('es-ES', { 
-    weekday: 'long', 
-    day: 'numeric', 
-    month: 'long' 
+  const nombreUsuario = user?.displayName || 'tú';
+  const fechaHoyStr = new Date().toLocaleDateString('es-ES', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
   }).replace(/^\w/, (c) => c.toUpperCase());
 
   const recuerdo = useMemo(() => getRecuerdoDeHoy(), [getRecuerdoDeHoy]);
 
   const todayDay = new Date().getDay();
-  const activeHabitsToday = useMemo(() => 
+  const activeHabitsToday = useMemo(() =>
     habits.filter(h => h.diasActivos.includes(todayDay))
   , [habits, todayDay]);
 
-  const habitosHoyCount = useMemo(() => 
+  const habitosHoyCount = useMemo(() =>
     activeHabitsToday.filter(h => getLogForHabit(h.id)?.completado).length
   , [activeHabitsToday, getLogForHabit]);
 
   const totalHabitosToday = activeHabitsToday.length;
-  
-  const progresoPercent = useMemo(() => 
+
+  const progresoPercent = useMemo(() =>
     totalHabitosToday > 0 ? (habitosHoyCount / totalHabitosToday) * 100 : 0
   , [habitosHoyCount, totalHabitosToday]);
 
   const visibleHabits = useMemo(() => {
     const priorityOrder: Record<string, number> = { alta: 0, media: 1, baja: 2 };
-    
+
     const dailyActive = [...activeHabitsToday].sort((a, b) => {
       const pDiff = (priorityOrder[a.prioridad || 'media'] ?? 1) - (priorityOrder[b.prioridad || 'media'] ?? 1);
       if (pDiff !== 0) return pDiff;
@@ -144,28 +93,20 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
         return (a.id || '').localeCompare(b.id || '');
       });
 
-    const combined = [...dailyActive, ...others];
-
-    return combined.slice(0, 4);
+    return [...dailyActive, ...others].slice(0, 4);
   }, [activeHabitsToday, habits, todayDay]);
 
   const visibleTasks = useMemo(() => {
     const priorityOrder: Record<string, number> = { alta: 0, media: 1, baja: 2 };
-    const sorted = tasks
+    return tasks
       .filter(t => !t.completada)
-      .sort((a, b) => (priorityOrder[a.prioridad || 'media'] ?? 1) - (priorityOrder[b.prioridad || 'media'] ?? 1));
-    
-    if (sorted.length > 4) return sorted.slice(0, 4);
-    return sorted;
+      .sort((a, b) => (priorityOrder[a.prioridad || 'media'] ?? 1) - (priorityOrder[b.prioridad || 'media'] ?? 1))
+      .slice(0, 4);
   }, [tasks]);
-
-  const recompensasDisponibles = useMemo(() => 
-    rewards.filter(r => estaDisponible(r)).slice(0, 2)
-  , [rewards, estaDisponible]);
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-6 pb-12 space-y-8 overflow-x-hidden">
-      
+
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -204,10 +145,10 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
         </motion.div>
       )}
 
-      <motion.div 
-        className="bg-bg-card rounded-2xl border border-border p-5 space-y-6" 
-        initial={{ opacity: 0 }} 
-        animate={{ opacity: 1 }} 
+      <motion.div
+        className="bg-bg-card rounded-2xl border border-border p-5 space-y-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ delay: 0.1 }}
       >
         <div className="flex justify-between items-end cursor-pointer" onClick={() => onNavigate('habits')}>
@@ -217,7 +158,7 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
           </div>
           <span className="text-accent font-bold text-xl">{habitosHoyCount} / {totalHabitosToday}</span>
         </div>
-        
+
         <div className="space-y-4">
           <div className="h-2.5 bg-bg-elevated rounded-full overflow-hidden border border-border/50">
             <motion.div
@@ -236,7 +177,7 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
                 const log = getLogForHabit(habit.id);
                 const isChecked = log?.completado || false;
                 return (
-                  <div 
+                  <div
                     key={habit.id}
                     className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
                       isChecked ? 'bg-accent/5 border-accent/20' : 'bg-bg-primary/40 border-border/50'
@@ -254,8 +195,8 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
                     <button
                       onClick={() => toggleCheck(habit.id)}
                       className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
-                        isChecked 
-                          ? 'bg-accent border-accent text-white' 
+                        isChecked
+                          ? 'bg-accent border-accent text-white'
                           : 'border-border hover:border-accent/50'
                       }`}
                     >
@@ -278,7 +219,7 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
           <h3 className="text-sm font-bold text-text-secondary uppercase tracking-widest flex items-center gap-2">
             <span className="text-accent">🚀</span> Mis Tareas
           </h3>
-          <button 
+          <button
             onClick={() => onNavigate('tasks')}
             className="text-accent text-xs font-bold hover:underline"
           >
@@ -293,7 +234,7 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
           ) : (
             visibleTasks.map(task => (
               <div key={task.id} className="bg-bg-card border border-border p-4 rounded-xl flex items-center gap-3 active:scale-[0.98] transition-transform">
-                <div 
+                <div
                   onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }}
                   className={`w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer flex-shrink-0 transition-all ${
                     task.prioridad === 'alta' ? 'border-danger/50 bg-danger/5' : 'border-accent/50'
@@ -301,7 +242,7 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
                 >
                   {task.completada && <span className="text-accent text-xs">✓</span>}
                 </div>
-                
+
                 <div className="flex-1 min-w-0" onClick={() => onNavigate('tasks')}>
                   <p className="text-sm font-medium text-text-primary truncate">
                     {task.titulo}
@@ -316,18 +257,18 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
         </div>
       </motion.div>
 
-      <motion.div 
-        className="bg-bg-card rounded-2xl border border-border p-6 text-center space-y-6 cursor-pointer hover:bg-bg-elevated/20 transition-all active:scale-[0.99]" 
-        initial={{ opacity: 0 }} 
-        animate={{ opacity: 1 }} 
+      <motion.div
+        className="bg-bg-card rounded-2xl border border-border p-6 text-center space-y-6 cursor-pointer hover:bg-bg-elevated/20 transition-all active:scale-[0.99]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
         onClick={() => onNavigate('journal')}
       >
         <h3 className="text-lg font-bold text-text-primary">📓 Ideas y Recuerdos</h3>
-        
+
         <div className="grid grid-cols-1 gap-3">
           <button
-            onClick={(e) => { e.stopPropagation(); setShowQuickNoteForm(true); }}
+            onClick={(e) => { e.stopPropagation(); openQuickAction('note'); }}
             className="group py-5 rounded-3xl border border-border bg-gradient-to-br from-bg-primary/50 to-bg-elevated/10 text-white hover:border-accent hover:from-accent/10 hover:to-accent/5 transition-all font-bold flex items-center justify-between px-6 shadow-sm active:scale-[0.98]"
           >
             <div className="flex items-center gap-4">
@@ -341,7 +282,7 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
           </button>
 
           <button
-            onClick={(e) => { e.stopPropagation(); setAutoOpenCamera(false); setShowJournalForm(true); }}
+            onClick={(e) => { e.stopPropagation(); openQuickAction('journal'); }}
             className="group py-5 rounded-3xl border border-border bg-gradient-to-br from-bg-primary/50 to-bg-elevated/10 text-white hover:border-accent hover:from-accent/10 hover:to-accent/5 transition-all font-bold flex items-center justify-between px-6 shadow-sm active:scale-[0.98]"
           >
             <div className="flex items-center gap-4">
@@ -355,7 +296,7 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
           </button>
 
           <button
-            onClick={(e) => { e.stopPropagation(); setAutoOpenCamera(true); setShowJournalForm(true); }}
+            onClick={(e) => { e.stopPropagation(); openQuickAction('photo'); }}
             className="group py-5 rounded-3xl border border-border bg-gradient-to-br from-bg-primary/50 to-bg-elevated/10 text-white hover:border-accent hover:from-accent/10 hover:to-accent/5 transition-all font-bold flex items-center justify-between px-6 shadow-sm active:scale-[0.98]"
           >
             <div className="flex items-center gap-4">
@@ -370,123 +311,12 @@ export function HomePage({ onNavigate, onNavigateToRewards }: HomePageProps) {
         </div>
       </motion.div>
 
-      {/* SECCIÓN 6 — Mis Recompensas (Mejora 2) */}
-      <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-        <div className="flex items-center justify-between px-1">
-          <div className="flex flex-col">
-            <h3 className="text-sm font-bold text-text-secondary uppercase tracking-widest flex items-center gap-2">
-              🎁 Mis Recompensas
-            </h3>
-            <span className="text-text-secondary text-xs mt-0.5">
-              ⭐ {totalPoints} puntos disponibles
-            </span>
-          </div>
-          <button 
-            onClick={onNavigateToRewards}
-            className="text-accent text-xs font-bold hover:underline"
-          >
-            Ver catálogo →
-          </button>
-        </div>
-        
-        {recompensasDisponibles.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3">
-            {recompensasDisponibles.map(reward => (
-              <div 
-                key={reward.id} 
-                className="bg-bg-card border border-border p-4 rounded-xl flex flex-col items-center gap-2 text-center cursor-pointer hover:bg-bg-elevated transition-colors shadow-sm"
-                onClick={onNavigateToRewards}
-              >
-                <span className="text-2xl">{reward.icono}</span>
-                <span className="text-[10px] font-bold text-text-primary line-clamp-1 uppercase">{reward.nombre}</span>
-                <span className="text-[10px] font-extrabold text-accent">{reward.precioPuntos} puntos</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div 
-            className="bg-bg-card border border-border border-dashed p-6 rounded-xl text-center cursor-pointer"
-            onClick={onNavigateToRewards}
-          >
-            <p className="text-xs text-text-secondary italic">Define tus premios en Ajustes para motivarte</p>
-          </div>
-        )}
-      </motion.div>
-
-      {/* Modales */}
-      {showJournalForm && (
-        <JournalForm
-          autoOpenCamera={autoOpenCamera}
-          onSubmit={(data) => {
-            createEntry(data);
-            setShowJournalForm(false);
-            setAutoOpenCamera(false);
-          }}
-          onClose={() => {
-            setShowJournalForm(false);
-            setAutoOpenCamera(false);
-          }}
-        />
-      )}
-
-      {showQuickNoteForm && (
-        <QuickNoteModal
-          onSubmit={(data) => {
-            createEntry({ ...data, fotos: [] });
-            setShowQuickNoteForm(false);
-          }}
-          onClose={() => setShowQuickNoteForm(false)}
-        />
-      )}
-
       {selectedEntry && (
         <JournalDetailModal
           entry={selectedEntry}
           onClose={() => setSelectedEntry(null)}
         />
       )}
-
-      {/* Modal Personalización Nombre (Bug 2) */}
-      <AnimatePresence>
-        {showNameModal && (
-          <motion.div
-            className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="bg-bg-card border border-border rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-6"
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-            >
-              <div className="text-4xl">👋</div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-bold text-text-primary">¿Cómo quieres que te llamemos?</h3>
-                <p className="text-sm text-text-secondary italic">Queremos saludarte por tu nombre.</p>
-              </div>
-              
-              <input 
-                type="text" 
-                value={tempName}
-                onChange={(e) => setTempName(e.target.value)}
-                placeholder="Tu nombre o apodo"
-                className="w-full bg-bg-primary border border-border p-4 rounded-xl text-center text-lg font-bold text-text-primary focus:border-accent outline-none"
-                autoFocus
-                onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-              />
-
-              <button
-                onClick={handleSaveName}
-                disabled={!tempName.trim()}
-                className="w-full py-4 rounded-xl bg-accent text-white font-bold hover:bg-accent/90 transition-all disabled:opacity-50"
-              >
-                Listo, empecemos 🚀
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

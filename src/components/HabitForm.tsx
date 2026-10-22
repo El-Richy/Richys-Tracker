@@ -9,11 +9,19 @@ const PRESET_COLORS = [
   '#A855F7', '#EC4899', '#EF4444', '#F59E0B',
 ];
 
-/** Iconos predefinidos */
+/** Common shortcuts. Any emoji can also be typed or pasted. */
 const PRESET_ICONS = [
   '💪', '📚', '🏃', '💧', '🧘', '🎯', '✍️', '💤',
   '🥗', '🎨', '🎵', '💻', '🧹', '🌅', '📱', '⭐',
+  '🧠', '❤️', '🍎', '🚿', '🦷', '🛏️', '🚶', '🚴',
 ];
+
+function lastGrapheme(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  const chars = Array.from(trimmed);
+  return chars[chars.length - 1] ?? '';
+}
 
 /** Días de la semana (abreviados) */
 const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -102,6 +110,7 @@ export function HabitForm({ habit, onSubmit, onClose }: HabitFormProps) {
     <AnimatePresence>
       {/* Overlay */}
       <motion.div
+        data-no-swipe
         className="fixed inset-0 bg-black/60 z-40 flex items-end sm:items-center justify-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -150,9 +159,34 @@ export function HabitForm({ habit, onSubmit, onClose }: HabitFormProps) {
 
             {/* Icono */}
             <div>
-              <label className="block text-sm text-text-secondary mb-1.5">
+              <label htmlFor="habit-icon" className="block text-sm text-text-secondary mb-1.5">
                 Icono
               </label>
+              <div className="flex items-center gap-2 mb-2">
+                <div
+                  className="w-12 h-12 rounded-lg bg-bg-elevated border border-border flex items-center justify-center text-2xl shrink-0"
+                  aria-hidden
+                >
+                  {icono || '✨'}
+                </div>
+                <input
+                  id="habit-icon"
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={icono}
+                  onChange={(e) => {
+                    const next = lastGrapheme(e.target.value);
+                    if (next) setIcono(next);
+                  }}
+                  placeholder="Cualquier emoji"
+                  aria-label="Elegí cualquier emoji"
+                  className="w-14 h-12 text-center text-2xl px-1 rounded-lg bg-bg-primary border border-border text-text-primary placeholder-text-secondary/50 focus:border-accent focus:outline-none transition-colors"
+                />
+              </div>
+              <p className="text-[11px] text-text-secondary mb-2">
+                Elegí un atajo o escribí / pegá cualquier emoji.
+              </p>
               <div className="flex flex-wrap gap-2">
                 {PRESET_ICONS.map((icon) => (
                   <button

@@ -16,4 +16,3 @@ export const colors = {
   danger: '#EF4444',
 } as const;
 
-export type ColorToken = keyof typeof colors;

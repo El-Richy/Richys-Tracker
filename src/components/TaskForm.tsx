@@ -67,6 +67,7 @@ export function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
   return (
     <AnimatePresence>
       <motion.div
+        data-no-swipe
         className="fixed inset-0 bg-black/60 z-40 flex items-end sm:items-center justify-center p-0 sm:p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

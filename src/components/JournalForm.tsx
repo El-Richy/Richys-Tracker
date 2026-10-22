@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { JournalEntry } from '../types';
+import { saveJpegToGallery } from '../lib/gallery';
 
 interface JournalFormProps {
   onSubmit: (data: JournalFormData) => void;
@@ -86,6 +87,7 @@ export function JournalForm({
         
         const comprimida = await comprimirImagen(base64);
         newFotos.push(comprimida);
+        void saveJpegToGallery(comprimida);
       } catch (err) {
         console.error('Error procesando imagen:', err);
         setError('Error al procesar una de las imágenes.');
@@ -119,6 +121,7 @@ export function JournalForm({
   return (
     <AnimatePresence>
       <motion.div
+        data-no-swipe
         className="fixed inset-0 bg-black/80 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

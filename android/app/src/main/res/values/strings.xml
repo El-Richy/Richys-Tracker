@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Richy\'s Tracker</string>
+    <string name="title_activity_main">Richy\'s Tracker</string>
+    <string name="package_name">com.richys.tracker</string>
+    <string name="custom_url_scheme">com.richys.tracker</string>
+    <string name="shortcut_note_short">Nota rápida</string>
+    <string name="shortcut_note_long">Nota rápida</string>
+    <string name="shortcut_journal_short">Entrada rápida</string>
+    <string name="shortcut_journal_long">Entrada de diario</string>
+    <string name="shortcut_photo_short">Foto rápida</string>
+    <string name="shortcut_photo_long">Foto rápida</string>
+</resources>

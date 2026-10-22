@@ -20,3 +20,11 @@ dist-ssr
 
 # Vite
 .vite/
+# Local Pi runtime state
+.atl/
+
+# Local agent notes and planning docs. Not part of the app.
+.agents/
+.commandcode/
+odd/
+skills-lock.json

@@ -106,21 +106,7 @@ export function JournalPage() {
         <div className="text-center py-12 text-text-secondary">Cargando diario...</div>
       )}
 
-      {/* Contenido con Swipe */}
-      <motion.div
-        drag="x"
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.2}
-        onDragEnd={(_, info) => {
-          const threshold = 100;
-          if (info.offset.x < -threshold && filter === 'journal') {
-            setFilter('note');
-          } else if (info.offset.x > threshold && filter === 'note') {
-            setFilter('journal');
-          }
-        }}
-        className="flex-1 w-full touch-pan-y"
-      >
+      <motion.div className="flex-1 w-full">
         {/* Empty State */}
         {!isLoading && filteredEntries.length === 0 && (
           <motion.div 
@@ -179,7 +165,7 @@ export function JournalPage() {
           if (filter === 'note') setShowQuickNoteForm(true);
           else setShowForm(true);
         }}
-        className="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-accent text-white text-2xl shadow-lg shadow-accent/30 flex items-center justify-center z-20"
+        className="fixed bottom-20 right-6 w-14 h-14 rounded-full bg-accent text-white text-2xl shadow-lg shadow-accent/30 flex items-center justify-center z-20"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.9 }}
       >

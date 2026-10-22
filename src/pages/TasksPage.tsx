@@ -136,7 +136,7 @@ export function TasksPage() {
       {/* FAB */}
       <motion.button
         onClick={() => setShowForm(true)}
-        className="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-accent text-white text-2xl shadow-lg shadow-accent/30 flex items-center justify-center z-20"
+        className="fixed bottom-20 right-6 w-14 h-14 rounded-full bg-accent text-white text-2xl shadow-lg shadow-accent/30 flex items-center justify-center z-20"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.9 }}
       >

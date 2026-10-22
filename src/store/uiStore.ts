@@ -8,10 +8,15 @@ interface Toast {
   type: ToastType;
 }
 
+export type QuickAction = 'note' | 'journal' | 'photo';
+
 interface UiState {
   toasts: Toast[];
   showToast: (message: string, type?: ToastType) => void;
   removeToast: (id: string) => void;
+  quickAction: QuickAction | null;
+  openQuickAction: (action: QuickAction) => void;
+  clearQuickAction: () => void;
 }
 
 export const useUiStore = create<UiState>()((set) => ({
@@ -33,4 +38,7 @@ export const useUiStore = create<UiState>()((set) => ({
     set((state) => ({
       toasts: state.toasts.filter((t) => t.id !== id),
     })),
+  quickAction: null,
+  openQuickAction: (action) => set({ quickAction: action }),
+  clearQuickAction: () => set({ quickAction: null }),
 }));

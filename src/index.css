@@ -10,9 +10,13 @@ body {
   margin: 0;
   background-color: #0F0F0F;
   color: #F5F5F5;
-  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-family: ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+main {
+  touch-action: pan-y;
 }
 
 /* Focus visible para accesibilidad */

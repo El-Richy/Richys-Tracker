@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#0F0F0F"/>
-  <text x="16" y="23" font-size="20" text-anchor="middle" fill="#F0611A">🔥</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <rect width="108" height="108" fill="#F0611A"/>
+  <path fill="#FFF6ED" fill-rule="evenodd" d="M54 26a28 28 0 1 1 0 56a28 28 0 1 1 0-56zm0 7a21 21 0 1 1 0 42a21 21 0 1 1 0-42z"/>
+  <path fill="#FFF6ED" fill-rule="evenodd" d="M54 40a14 14 0 1 1 0 28a14 14 0 1 1 0-28zm0 7a7 7 0 1 1 0 14a7 7 0 1 1 0-14z"/>
+  <circle cx="54" cy="54" r="2.5" fill="#FFF6ED"/>
 </svg>

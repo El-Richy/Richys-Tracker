@@ -29,6 +29,7 @@ export function JournalDetailModal({ entry, onClose }: JournalDetailModalProps) 
   return (
     <AnimatePresence>
       <motion.div
+        data-no-swipe
         className="fixed inset-0 bg-black/95 z-[60] flex items-center justify-center p-0 lg:p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

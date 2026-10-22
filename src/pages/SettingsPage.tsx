@@ -1,91 +1,128 @@
-import { useState } from 'react';
+import { useState, useRef, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore, useHabitStore } from '../store';
 import { db } from '../db';
-import { MetricsPage } from './MetricsPage';
-import { RewardsPage } from './RewardsPage';
-import { supabase } from '../lib/supabase';
+import { calcularTotalPuntos } from '../utils/pointsEngine';
+import {
+  collectBackup,
+  readBackupFile,
+  shareOrDownloadBackup,
+  type BackupPayload,
+} from '../lib/backup';
+
+const MetricsPage = lazy(() =>
+  import('./MetricsPage').then((mod) => ({ default: mod.MetricsPage }))
+);
 
 interface SettingsPageProps {
-  activeSubPage: 'metrics' | 'rewards' | null;
-  onNavigateSubPage: (sub: 'metrics' | 'rewards' | null) => void;
+  activeSubPage: 'metrics' | null;
+  onNavigateSubPage: (sub: 'metrics' | null) => void;
 }
 
-/**
- * Pantalla de ajustes con logout, accesos a métricas/recompensas y zona de peligro.
- */
 export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageProps) {
-  const { user, logout } = useAuthStore();
+  const { user, logout, updateProfile } = useAuthStore();
   const { totalPoints, setTotalPoints } = useHabitStore();
-  
+
   const [isExporting, setIsExporting] = useState(false);
-  const [confirmReset, setConfirmReset] = useState<'none' | 'streaks' | 'points' | 'rewards'>('none');
-  
-  const [newName, setNewName] = useState(localStorage.getItem('displayName') || user?.user_metadata?.display_name || '');
+  const [isImporting, setIsImporting] = useState(false);
+  const [confirmReset, setConfirmReset] = useState<'none' | 'streaks' | 'points' | 'app'>('none');
+
+  const [newName, setNewName] = useState(user?.displayName || '');
   const [isSavingName, setIsSavingName] = useState(false);
 
-  // Render subpages
-  if (activeSubPage === 'metrics') {
-    return <MetricsPage onBack={() => onNavigateSubPage(null)} />;
-  }
+  const importInputRef = useRef<HTMLInputElement>(null);
 
-  if (activeSubPage === 'rewards') {
-    return <RewardsPage onBack={() => onNavigateSubPage(null)} />;
+  if (activeSubPage === 'metrics') {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-bg-primary" />}>
+        <MetricsPage onBack={() => onNavigateSubPage(null)} />
+      </Suspense>
+    );
   }
 
   async function handleExport() {
     if (!user || isExporting) return;
     try {
       setIsExporting(true);
-      const habitos = await db.habits.where('userId').equals(user.id).toArray();
-      const habitIds = habitos.map(h => h.id);
-      const logs = await db.habitLogs.where('habitId').anyOf(habitIds).toArray();
-      const entries = await db.journalEntries.where('userId').equals(user.id).toArray();
-      const tasks = await db.tasks.where('userId').equals(user.id).toArray();
-      
-      const data = {
-        exportadoEn: new Date().toISOString(),
-        version: "1.1.0",
-        habitos,
-        logs,
-        journal: entries,
-        tasks
-      };
-      
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `richys-tracker-export-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const payload = await collectBackup(user);
+      await shareOrDownloadBackup(payload);
     } catch (error) {
       console.error('Export error:', error);
-      alert('Error al exportar datos.');
+      alert('No se pudo exportar. En el celular debería abrirse la hoja para guardar o compartir el JSON.');
     } finally {
       setIsExporting(false);
+    }
+  }
+
+  async function applyBackup(data: BackupPayload) {
+    if (!user) return;
+    await db.transaction('rw', db.tables, async () => {
+      await db.habits.clear();
+      await db.habitLogs.clear();
+      await db.journalEntries.clear();
+      await db.tasks.clear();
+      await db.streaks.clear();
+      await db.badges.clear();
+      await db.pointEntries.clear();
+
+      const userId = user.id;
+      const reasignar = <T extends { userId?: string }>(item: T): T => ({ ...item, userId });
+
+      if (data.habitos?.length) await db.habits.bulkAdd(data.habitos.map(reasignar));
+      if (data.logs?.length) await db.habitLogs.bulkAdd(data.logs);
+      if (data.journal?.length) await db.journalEntries.bulkAdd(data.journal.map(reasignar));
+      if (data.tasks?.length) await db.tasks.bulkAdd(data.tasks.map(reasignar));
+      if (data.streaks?.length) await db.streaks.bulkPut(data.streaks);
+      if (data.badges?.length) await db.badges.bulkAdd(data.badges);
+      if (data.pointEntries?.length) {
+        const reasignados = data.pointEntries.map(reasignar);
+        await db.pointEntries.bulkAdd(reasignados);
+        setTotalPoints(calcularTotalPuntos(reasignados));
+      }
+    });
+
+    if (data.usuario) {
+      await updateProfile(data.usuario);
+    }
+  }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!user || !e.target.files?.length) return;
+    const file = e.target.files[0];
+    setIsImporting(true);
+    try {
+      const data = await readBackupFile(file);
+      await applyBackup(data);
+      alert('Datos importados correctamente. La página se recargará.');
+      window.location.reload();
+    } catch (error) {
+      console.error('Import error:', error);
+      const code = error instanceof Error ? error.message : '';
+      const message =
+        code === 'too_large'
+          ? 'El archivo es demasiado grande (máximo 25 MB).'
+          : code === 'empty_backup'
+            ? 'El archivo no tiene hábitos, tareas ni diario para importar.'
+            : 'El archivo no es un respaldo válido. No se modificaron tus datos.';
+      alert(message);
+    } finally {
+      setIsImporting(false);
+      if (importInputRef.current) importInputRef.current.value = '';
     }
   }
 
   const resetStreaks = async () => {
     if (!user) return;
     try {
-      const streaks = await db.streaks.where('userId').equals(user.id).toArray();
+      const streaks = await db.streaks.toArray();
       for (const s of streaks) {
-        await db.streaks.update(s.habitId, { 
-          rachaActual: 0, 
-          rachaMaxima: 0, 
-          estado: 'rota', 
-          ultimoCheck: new Date().toISOString() 
+        await db.streaks.update(s.habitId, {
+          rachaActual: 0,
+          rachaMaxima: 0,
+          estado: 'rota',
+          ultimoCheck: new Date().toISOString()
         });
       }
-      await supabase.from('habits').update({ 
-        racha_actual: 0, 
-        racha_maxima: 0 
-      }).eq('user_id', user.id);
-      
       setConfirmReset('none');
       window.location.reload();
     } catch (e) {
@@ -97,34 +134,20 @@ export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageP
     if (!user) return;
     try {
       await db.pointEntries.where('userId').equals(user.id).delete();
-      await db.points.where('userId').equals(user.id).delete();
       setTotalPoints(0);
-      await supabase.from('point_entries').delete().eq('user_id', user.id);
-      await supabase.from('points').delete().eq('user_id', user.id);
       setConfirmReset('none');
     } catch (e) {
       console.error(e);
     }
   };
 
-  const resetRewards = async () => {
+  const resetApp = async () => {
     if (!user) return;
     try {
-      // Dexie
-      await db.rewards.where('userId').equals(user.id).modify({ 
-        canjeada: false, 
-        ultimoCanjeo: undefined 
-      });
-
-      // Supabase
-      await supabase.from('rewards')
-        .update({ canjeada: false, ultimo_canjeo: null })
-        .eq('user_id', user.id);
-
-      // Zustand (auto-sync usually handled by hooks, but we reload or manually update store if needed)
-      // Since our hooks listen to Dexie changes or we can just reload for safety
-      setConfirmReset('none');
-      window.location.reload(); 
+      await db.delete();
+      await db.open();
+      localStorage.clear();
+      window.location.reload();
     } catch (e) {
       console.error(e);
     }
@@ -134,11 +157,7 @@ export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageP
     if (!user || !newName.trim()) return;
     try {
       setIsSavingName(true);
-      localStorage.setItem('displayName', newName.trim());
-      const { error } = await supabase.auth.updateUser({
-        data: { display_name: newName.trim() }
-      });
-      if (error) throw error;
+      await updateProfile({ displayName: newName.trim() });
       alert('Nombre actualizado correctamente');
     } catch (e) {
       console.error(e);
@@ -155,7 +174,6 @@ export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageP
         <p className="text-sm text-text-secondary mt-1">Configuración y seguimiento personal</p>
       </div>
 
-      {/* SECCIÓN — Estrellas/Progreso Rápido */}
       <div className="bg-gradient-to-br from-bg-card to-bg-elevated/40 rounded-3xl border border-border p-6 shadow-xl flex items-center justify-between">
         <div className="space-y-1">
           <p className="text-[10px] font-black text-accent uppercase tracking-widest">Tus Puntos de Vida</p>
@@ -166,22 +184,7 @@ export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageP
         </div>
       </div>
 
-      {/* ACCESOS DIRECTOS — Estadísticas y Premios */}
       <div className="grid grid-cols-1 gap-3">
-        <button
-          onClick={() => onNavigateSubPage('rewards')}
-          className="w-full py-5 rounded-2xl bg-bg-card border border-border text-text-primary font-bold hover:bg-bg-elevated transition-all flex items-center justify-between px-6 shadow-sm active:scale-[0.98]"
-        >
-          <div className="flex items-center gap-4">
-            <span className="text-2xl">🎁</span>
-            <div className="text-left">
-              <span className="block text-sm">Mis Recompensas</span>
-              <span className="block text-[10px] text-text-secondary font-normal italic">Canjear puntos por premios</span>
-            </div>
-          </div>
-          <span className="text-accent text-lg">→</span>
-        </button>
-
         <button
           onClick={() => onNavigateSubPage('metrics')}
           className="w-full py-5 rounded-2xl bg-bg-card border border-border text-text-primary font-bold hover:bg-bg-elevated transition-all flex items-center justify-between px-6 shadow-sm active:scale-[0.98]"
@@ -197,12 +200,11 @@ export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageP
         </button>
       </div>
 
-      {/* MI CUENTA */}
       <div className="bg-bg-card rounded-2xl border border-border p-5 space-y-5 shadow-sm">
         <h2 className="text-xs font-bold text-text-secondary uppercase tracking-widest flex items-center gap-2">
-          <span>👤</span> Mi Cuenta
+          <span>👤</span> Mi Perfil
         </h2>
-        
+
         <div className="space-y-4">
           <div className="space-y-1">
             <label className="text-[10px] text-text-secondary uppercase font-bold tracking-wider ml-1">Nombre / Apodo</label>
@@ -230,13 +232,29 @@ export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageP
           >
             {isExporting ? '...' : '📥 Exportar historial (JSON)'}
           </button>
+
+          <div>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json,text/plain"
+              onChange={handleImport}
+              className="sr-only"
+            />
+            <button
+              onClick={() => importInputRef.current?.click()}
+              disabled={isImporting}
+              className="w-full py-3.5 rounded-xl bg-bg-elevated text-text-primary hover:bg-bg-primary transition-all text-sm font-bold flex items-center justify-center gap-3 border border-border/50"
+            >
+              {isImporting ? '...' : '📤 Importar respaldo (JSON)'}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* ZONA DE PELIGRO */}
       <div className="bg-danger/5 rounded-2xl border border-danger/10 p-5 space-y-4">
         <h2 className="text-[10px] font-black text-danger uppercase tracking-[0.2em] flex items-center gap-2">
-          <span>⚠️</span> Cuida tus pasos
+          <span>⚠️</span> Zona de Peligro
         </h2>
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
@@ -254,10 +272,10 @@ export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageP
             </button>
           </div>
           <button
-            onClick={() => setConfirmReset('rewards')}
+            onClick={() => setConfirmReset('app')}
             className="w-full py-3 rounded-xl border border-danger/20 text-danger text-[10px] font-bold hover:bg-danger/10 transition-colors uppercase"
           >
-            🎁 Reiniciar Recompensas
+            Reiniciar App
           </button>
         </div>
         <button
@@ -268,38 +286,39 @@ export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageP
         </button>
       </div>
 
-      {/* Modales Confirmación */}
       <AnimatePresence>
         {confirmReset !== 'none' && (
-          <motion.div 
+          <motion.div
             className="fixed inset-0 bg-black/90 z-[70] flex items-center justify-center p-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <motion.div 
+            <motion.div
               className="bg-bg-card border border-border rounded-3xl p-8 max-w-xs w-full shadow-2xl text-center space-y-5"
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
             >
               <div className="text-5xl">🚨</div>
-              <h3 className="text-xl font-black text-text-primary uppercase tracking-tighter">¿Confirmar Acción?</h3>
+              <h3 className="text-xl font-black text-text-primary uppercase tracking-tighter">
+                {confirmReset === 'app' ? '¿Reiniciar App?' : '¿Confirmar Acción?'}
+              </h3>
               <p className="text-sm text-text-secondary leading-relaxed">
-                {confirmReset === 'rewards' 
-                  ? "¿Reiniciar todas las recompensas? Se eliminarán todos los canjeos. No se puede deshacer."
-                  : `Esta acción es irreversible. Se borrarán tus datos de ${confirmReset === 'streaks' ? " racha actual y récords históricos." : " puntuación acumulada."}`
+                {confirmReset === 'app'
+                  ? 'Se eliminarán TODOS tus datos (hábitos, tareas, diario, puntos, rachas y badges). Esta acción es irreversible.'
+                  : `Esta acción es irreversible. Se borrarán tus datos de ${confirmReset === 'streaks' ? 'racha actual y récords históricos.' : 'puntuación acumulada.'}`
                 }
               </p>
               <div className="flex flex-col gap-2 pt-4">
                 <button
                   onClick={() => {
-                     if (confirmReset === 'streaks') resetStreaks();
-                     else if (confirmReset === 'points') resetPoints();
-                     else if (confirmReset === 'rewards') resetRewards();
+                    if (confirmReset === 'streaks') resetStreaks();
+                    else if (confirmReset === 'points') resetPoints();
+                    else if (confirmReset === 'app') resetApp();
                   }}
                   className="w-full py-4 rounded-2xl bg-danger text-white font-black uppercase tracking-widest text-xs active:scale-95 transition-transform"
                 >
-                  Eliminar
+                  {confirmReset === 'app' ? 'Reiniciar todo' : 'Eliminar'}
                 </button>
                 <button
                   onClick={() => setConfirmReset('none')}

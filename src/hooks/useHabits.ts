@@ -6,35 +6,26 @@ import { useHabitProgress } from './habits/useHabitProgress';
 import { useHabitImpact } from './habits/useHabitImpact';
 import { getLocalDateStr } from '../utils/dateUtils';
 
-/**
- * Hook Façade para CRUD de hábitos, checks diarios, rachas y puntos.
- * Consolida la lógica fragmentada en ganchos especializados para mantener
- * la compatibilidad con la interfaz pública original.
- */
 export function useHabits() {
-  // 1. Estado centralizado (Zustand)
   const habits = useHabitStore((s) => s.habits);
   const logs = useHabitStore((s) => s.logs);
   const streaks = useHabitStore((s) => s.streaks);
   const badges = useHabitStore((s) => s.badges);
-  const pointEntries = useHabitStore((s) => s.pointEntries);
   const totalPoints = useHabitStore((s) => s.totalPoints);
   const isLoading = useHabitStore((s) => s.isLoading);
+  const pointEntries = useHabitStore((s) => s.pointEntries);
 
-  // 2. Micro-Hooks Especializados
   const { refresh } = useHabitSync();
   const { createHabit, editHabit, deleteHabit } = useHabitActions();
   const { recalcularTodasLasRachas, procesarPostCheck, confirmBadgeSeen } = useHabitImpact();
   const { toggleCheck, toggleSubtask, addSubtask } = useHabitProgress({ onPostCheck: procesarPostCheck });
 
-  // 3. Efectos automáticos (Rachas globales)
   useEffect(() => {
     if (habits.length > 0) {
       recalcularTodasLasRachas();
     }
   }, [habits.length, recalcularTodasLasRachas]);
 
-  // 4. Helpers de UI / Selectores derivados
   const getLogForHabit = (habitId: string, fecha: string = getLocalDateStr()) => {
     return logs.find((l) => l.habitId === habitId && l.fecha === fecha);
   };
@@ -55,7 +46,6 @@ export function useHabits() {
     });
   }, [habits]);
 
-  // API Pública consolidada (Retrocompatible)
   return {
     habits,
     logs,
@@ -65,8 +55,7 @@ export function useHabits() {
     totalPoints,
     isLoading,
     sortedHabits,
-    
-    // Funciones
+
     createHabit,
     editHabit,
     deleteHabit,

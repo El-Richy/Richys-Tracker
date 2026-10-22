@@ -1,39 +1,58 @@
 import { useEffect } from 'react';
-import { useAuthStore } from './store';
+import { useAuthStore, useUiStore } from './store';
 import { SplashScreen } from './components/SplashScreen';
-import { AuthPage } from './pages/AuthPage';
+import { OnboardingPage } from './pages/OnboardingPage';
 import { AppShell } from './components/AppShell';
-import { useNotifications } from './hooks/useNotifications';
+import { startNotificationLifecycle } from './lib/notifications';
+import type { QuickAction } from './store/uiStore';
 
-/**
- * App root con AuthGuard:
- * - isLoading → SplashScreen
- * - !user     → AuthPage
- * - user      → AppShell (tabs)
- */
+function shortcutFromUrl(url?: string | null): QuickAction | null {
+  if (!url) return null;
+  if (url.includes('shortcut/note')) return 'note';
+  if (url.includes('shortcut/journal')) return 'journal';
+  if (url.includes('shortcut/photo')) return 'photo';
+  return null;
+}
+
 function App() {
   const { user, isLoading, initialize } = useAuthStore();
-  const { requestPermission, clearAllReminders } = useNotifications();
+  const openQuickAction = useUiStore((s) => s.openQuickAction);
 
   useEffect(() => {
     initialize();
+    void import('@capacitor/splash-screen').then(({ SplashScreen }) => {
+      void SplashScreen.hide().catch(() => {});
+    });
   }, [initialize]);
 
-  useEffect(() => {
-    if (user) {
-      requestPermission();
-    } else {
-      // Limpiar todo al cerrar sesión para evitar fugas de memoria y notificaciones fantasma
-      clearAllReminders();
-    }
-  }, [user, requestPermission, clearAllReminders]);
+  useEffect(() => startNotificationLifecycle(), []);
 
-  if (isLoading && !user) {
+  useEffect(() => {
+    let handle: { remove: () => Promise<void> } | undefined;
+    let cancelled = false;
+    void import('@capacitor/app').then(async ({ App: CapApp }) => {
+      const launch = await CapApp.getLaunchUrl();
+      if (!cancelled) {
+        const action = shortcutFromUrl(launch?.url);
+        if (action) openQuickAction(action);
+      }
+      handle = await CapApp.addListener('appUrlOpen', (event) => {
+        const action = shortcutFromUrl(event.url);
+        if (action) openQuickAction(action);
+      });
+    });
+    return () => {
+      cancelled = true;
+      void handle?.remove();
+    };
+  }, [openQuickAction]);
+
+  if (isLoading) {
     return <SplashScreen />;
   }
 
   if (!user) {
-    return <AuthPage />;
+    return <OnboardingPage />;
   }
 
   return <AppShell />;

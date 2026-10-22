@@ -1,94 +1,71 @@
 import { create } from 'zustand';
-import type { User, Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import type { LocalUser } from '../types';
+import { generateId } from '../utils/idUtils';
+
+const STORAGE_KEY = 'richys_local_user';
+
+export const ACCENT_COLORS = [
+  { id: 'naranja', label: 'Naranja', value: '#F0611A' },
+  { id: 'azul', label: 'Azul', value: '#3B82F6' },
+  { id: 'verde', label: 'Verde', value: '#22C55E' },
+  { id: 'morado', label: 'Morado', value: '#A855F7' },
+  { id: 'rosa', label: 'Rosa', value: '#EC4899' },
+] as const;
+
+function loadUser(): LocalUser | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveUser(user: LocalUser) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+}
+
+function clearUser() {
+  localStorage.removeItem(STORAGE_KEY);
+}
 
 interface AuthState {
-  user: User | null;
-  session: Session | null;
+  user: LocalUser | null;
   isLoading: boolean;
-  error: string | null;
-
-  initialize: () => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  clearError: () => void;
+  initialize: () => void;
+  completeOnboarding: (displayName: string, accentColor: string) => Promise<void>;
+  updateProfile: (updates: Partial<LocalUser>) => Promise<void>;
+  logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>()((set) => ({
-  user: null,
-  session: null,
-  isLoading: true, // true al inicio mientras se verifica sesión
-  error: null,
+  user: loadUser(),
+  isLoading: false,
 
-  initialize: async () => {
-    try {
-      // Recuperar sesión existente
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw error;
-
-      set({
-        session: data.session,
-        user: data.session?.user ?? null,
-        isLoading: false,
-      });
-
-      // Listener para cambios de autenticación (login, logout, token refresh)
-      supabase.auth.onAuthStateChange((_event, session) => {
-        set({
-          session,
-          user: session?.user ?? null,
-        });
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Error al inicializar sesión';
-      console.error('Auth init error:', message);
-      set({ isLoading: false, error: message });
-    }
+  initialize: () => {
+    set({ user: loadUser(), isLoading: false });
   },
 
-  login: async (email: string, password: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw error;
-      // onAuthStateChange se encarga de actualizar user/session
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Error al iniciar sesión';
-      set({ error: message });
-    } finally {
-      set({ isLoading: false });
-    }
+  completeOnboarding: async (displayName: string, accentColor: string) => {
+    const user: LocalUser = {
+      id: generateId(),
+      displayName,
+      accentColor,
+    };
+    saveUser(user);
+    set({ user });
   },
 
-  register: async (email: string, password: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (error) throw error;
-      // onAuthStateChange se encarga de actualizar user/session
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Error al registrarse';
-      set({ error: message });
-    } finally {
-      set({ isLoading: false });
-    }
+  updateProfile: async (updates: Partial<LocalUser>) => {
+    const current = loadUser();
+    if (!current) return;
+    const updated = { ...current, ...updates };
+    saveUser(updated);
+    set({ user: updated });
   },
 
-  logout: async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('Logout error:', error.message);
-      // Aún así limpiamos el estado local
-    }
-    set({ user: null, session: null, error: null });
+  logout: () => {
+    clearUser();
+    set({ user: null });
   },
-
-  clearError: () => set({ error: null }),
 }));

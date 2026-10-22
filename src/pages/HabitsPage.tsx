@@ -111,7 +111,7 @@ export function HabitsPage() {
       <motion.button
         type="button"
         onClick={() => setShowForm(true)}
-        className="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-accent text-white text-2xl shadow-lg shadow-accent/30 hover:bg-accent/90 active:scale-90 transition-all flex items-center justify-center z-20"
+        className="fixed bottom-20 right-6 w-14 h-14 rounded-full bg-accent text-white text-2xl shadow-lg shadow-accent/30 hover:bg-accent/90 active:scale-90 transition-all flex items-center justify-center z-20"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.9 }}
       >

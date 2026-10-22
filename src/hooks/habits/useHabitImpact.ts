@@ -1,22 +1,19 @@
 import { useCallback } from 'react';
-import { useHabitStore, useAuthStore } from '../../store';
+import { useHabitStore, useAuthStore, useTaskStore, useJournalStore } from '../../store';
 import { db } from '../../db';
-import { supabase } from '../../lib/supabase';
 import { getLocalDateStr } from '../../utils/dateUtils';
 import { calcularRacha, detectarMilestone } from '../../utils/streakEngine';
 import {
   crearEntradaPuntos,
-  PUNTOS,
   BONUS_POR_MILESTONE,
-  syncPointEntry,
-  borrarPuntosDeHoy
+  borrarPuntosDeHoy,
+  calcularPuntosHabito,
 } from '../../utils/pointsEngine';
 import { evaluarBadges } from '../../utils/badges';
-import { useNotifications } from '../useNotifications';
+import { scheduleRiskReminder } from '../../lib/notifications';
 
-/**
- * Hook responsable de los efectos secundarios de las interacciones (Puntos, Rachas, Badges).
- */
+const MAX_LOG_DAYS = 90;
+
 export function useHabitImpact() {
   const user = useAuthStore((s) => s.user);
   const upsertStreakInStore = useHabitStore((s) => s.upsertStreak);
@@ -24,17 +21,11 @@ export function useHabitImpact() {
   const addPointEntryInStore = useHabitStore((s) => s.addPointEntry);
   const addBadgesInStore = useHabitStore((s) => s.addBadges);
   const markBadgeAsSeenInStore = useHabitStore((s) => s.markBadgeAsSeen);
-  
-  const { scheduleRiskReminder } = useNotifications();
 
-  /**
-   * Recalcula todas las rachas para la vista actual.
-   */
   const recalcularTodasLasRachas = useCallback(async () => {
     const store = useHabitStore.getState();
     if (!store.habits.length) return;
 
-    // Agrupar logs por hábito para eficiencia O(n)
     const logsPorHabito = new Map<string, Set<string>>();
     store.logs.forEach(l => {
       if (l.completado) {
@@ -47,20 +38,31 @@ export function useHabitImpact() {
       const existing = store.streaks.find((s) => s.habitId === habit.id);
       const fechas = logsPorHabito.get(habit.id) || new Set<string>();
       const racha = calcularRacha(habit, fechas, existing?.rachaMaxima ?? 0);
-      
       if (racha.estado === 'en_riesgo' && racha.rachaActual > 0) {
-        scheduleRiskReminder(habit, racha.rachaActual);
+        scheduleRiskReminder(habit.id, habit.nombre);
       }
       return racha;
     });
 
     setStreaksInStore(nuevasRachas);
     await db.streaks.bulkPut(nuevasRachas).catch(e => console.error('Dexie streak bulk error:', e));
-  }, [setStreaksInStore, scheduleRiskReminder]);
+  }, [setStreaksInStore]);
 
-  /**
-   * Procesa los cambios tras completar/desmarcar un hábito o subtarea.
-   */
+  const getRecentLogDates = useCallback(async (habitId: string) => {
+    const hoy = new Date();
+    const limite = new Date(hoy);
+    limite.setDate(limite.getDate() - MAX_LOG_DAYS);
+    const limiteStr = getLocalDateStr(limite);
+
+    const logs = await db.habitLogs
+      .where('habitId')
+      .equals(habitId)
+      .filter(l => l.fecha >= limiteStr)
+      .toArray();
+
+    return new Set(logs.filter(l => l.completado).map(l => l.fecha));
+  }, []);
+
   const procesarPostCheck = useCallback(async (habitId: string, completado: boolean, fecha?: string) => {
     if (!user) return;
     const store = useHabitStore.getState();
@@ -69,55 +71,35 @@ export function useHabitImpact() {
 
     const targetDate = fecha || getLocalDateStr();
 
-    // 1. Recalcular Racha específica
-    const logsActualizados = await db.habitLogs.where('habitId').equals(habitId).toArray();
-    const fechasCompletas = new Set(logsActualizados.filter(l => l.completado).map(l => l.fecha));
-    
+    const fechasCompletas = await getRecentLogDates(habitId);
     const existingStreak = store.streaks.find(s => s.habitId === habitId);
     const rachaAnterior = existingStreak?.rachaActual ?? 0;
-    
+
     const nuevaRacha = calcularRacha(habit, fechasCompletas, existingStreak?.rachaMaxima ?? 0);
     upsertStreakInStore(nuevaRacha);
     await db.streaks.put(nuevaRacha);
 
-    // Sync racha a Supabase
-    try {
-      const { error } = await supabase.from('streaks').upsert({
-        habit_id: nuevaRacha.habitId,
-        user_id: user.id,
-        racha_actual: nuevaRacha.rachaActual,
-        racha_maxima: nuevaRacha.rachaMaxima,
-        ultimo_check: nuevaRacha.ultimoCheck || null,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'habit_id,user_id' });
-      
-      if (error) throw error;
-    } catch (err) {
-      console.error('[Sync] Error sincronizando racha:', err);
-    }
-
-    // 2. Gestionar Puntos
     if (completado) {
-      // Evitar duplicados por re-renders
+      const puntosBase = calcularPuntosHabito(nuevaRacha.rachaActual);
+
       const existeBase = await db.pointEntries
         .where('habitId').equals(habitId)
-        .filter(e => e.fecha === targetDate && e.puntos === PUNTOS.COMPLETAR_HABITO)
+        .filter(e => e.fecha === targetDate && e.puntos === puntosBase)
         .count();
 
       if (existeBase === 0) {
         const entrada = crearEntradaPuntos(
           user.id,
-          PUNTOS.COMPLETAR_HABITO,
-          `+${PUNTOS.COMPLETAR_HABITO} por completar ${habit.nombre}`,
+          puntosBase,
+          `+${puntosBase} por completar ${habit.nombre}`,
           targetDate,
-          habitId
+          habitId,
+          'habit'
         );
         addPointEntryInStore(entrada);
         await db.pointEntries.add(entrada).catch(() => {});
-        syncPointEntry(entrada);
       }
 
-      // Bonus Milestones
       const milestone = detectarMilestone(rachaAnterior, nuevaRacha.rachaActual);
       if (milestone) {
         const razonBuscada = `bonus racha ${milestone} días`;
@@ -134,23 +116,18 @@ export function useHabitImpact() {
               bonusAmt,
               `+${bonusAmt} ${razonBuscada} (${habit.nombre})`,
               targetDate,
-              habitId
+              habitId,
+              'habit'
             );
             addPointEntryInStore(entryVal);
             await db.pointEntries.add(entryVal).catch(() => {});
-            syncPointEntry(entryVal);
           }
         }
       }
     } else {
-      // AL DESMARCAR: Anti-Cheat
       await borrarPuntosDeHoy(habitId, targetDate);
     }
 
-    // 3. Badges (Lazy Load stores de otros módulos)
-    const { useTaskStore } = await import('../../store/taskStore');
-    const { useJournalStore } = await import('../../store/journalStore');
-    
     const taskStore = useTaskStore.getState();
     const journalStore = useJournalStore.getState();
     const postImpactStore = useHabitStore.getState();
@@ -172,18 +149,15 @@ export function useHabitImpact() {
       addBadgesInStore(nuevosBadges);
       await db.badges.bulkAdd(nuevosBadges).catch(() => {});
     }
-  }, [user, upsertStreakInStore, addPointEntryInStore, addBadgesInStore]);
+  }, [user, upsertStreakInStore, addPointEntryInStore, addBadgesInStore, getRecentLogDates]);
 
-  /**
-   * Marca un badge como visto.
-   */
   const confirmBadgeSeen = useCallback(async (badgeId: string) => {
     markBadgeAsSeenInStore(badgeId);
     await db.badges.update(badgeId, { visto: true }).catch(() => {});
   }, [markBadgeAsSeenInStore]);
 
-  return { 
-    recalcularTodasLasRachas, 
+  return {
+    recalcularTodasLasRachas,
     procesarPostCheck,
     confirmBadgeSeen
   };
