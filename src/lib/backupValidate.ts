@@ -1,3 +1,9 @@
+export const MAX_IMPORT_BYTES = 25 * 1024 * 1024;
+
+export function assertImportableBackupSize(bytes: number): void {
+  if (bytes > MAX_IMPORT_BYTES) throw new Error('too_large');
+}
+
 const COLLECTION_KEYS = [
   'habitos',
   'logs',

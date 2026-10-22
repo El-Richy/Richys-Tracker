@@ -10,10 +10,11 @@ import type {
   Task,
 } from '../types';
 import { db } from '../db';
-import { validateBackupRecord } from './backupValidate';
+import { assertImportableBackupSize, validateBackupRecord } from './backupValidate';
+
+export { MAX_IMPORT_BYTES } from './backupValidate';
 
 export const BACKUP_VERSION = '2.0.0';
-export const MAX_IMPORT_BYTES = 25 * 1024 * 1024;
 
 export interface BackupPayload {
   exportadoEn: string;
@@ -87,9 +88,14 @@ function downloadJsonInBrowser(filename: string, json: string): void {
   URL.revokeObjectURL(url);
 }
 
+export function backupByteLength(json: string): number {
+  return new Blob([json]).size;
+}
+
 export async function shareOrDownloadBackup(payload: BackupPayload): Promise<void> {
   const filename = backupFilename();
   const json = JSON.stringify(payload, null, 2);
+  assertImportableBackupSize(backupByteLength(json));
 
   if (Capacitor.isNativePlatform()) {
     const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
@@ -135,7 +141,7 @@ export function parseBackupJson(text: string): BackupPayload {
 }
 
 export async function readBackupFile(file: File): Promise<BackupPayload> {
-  if (file.size > MAX_IMPORT_BYTES) throw new Error('too_large');
+  assertImportableBackupSize(file.size);
   const text = await file.text();
   return parseBackupJson(text);
 }

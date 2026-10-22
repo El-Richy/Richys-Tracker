@@ -48,7 +48,12 @@ export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageP
       await shareOrDownloadBackup(payload);
     } catch (error) {
       console.error('Export error:', error);
-      alert('No se pudo exportar. En el celular debería abrirse la hoja para guardar o compartir el JSON.');
+      const code = error instanceof Error ? error.message : '';
+      alert(
+        code === 'too_large'
+          ? 'El respaldo supera los 25 MB, así que no se podría volver a importar. No se generó el archivo.'
+          : 'No se pudo exportar. En el celular debería abrirse la hoja para guardar o compartir el JSON.',
+      );
     } finally {
       setIsExporting(false);
     }
@@ -308,7 +313,7 @@ export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageP
               </h3>
               <p className="text-sm text-text-secondary leading-relaxed">
                 {confirmReset === 'app'
-                  ? 'Se eliminarán TODOS tus datos (hábitos, tareas, diario, puntos, rachas y badges). Esta acción es irreversible.'
+                  ? 'Se eliminarán TODOS tus datos (hábitos, tareas, diario, puntos, rachas y badges). Esta acción es irreversible. Solo se puede recuperar con un respaldo ya guardado de hasta 25 MB.'
                   : `Esta acción es irreversible. Se borrarán tus datos de ${confirmReset === 'streaks' ? 'racha actual y récords históricos.' : 'puntuación acumulada.'}`
                 }
               </p>
