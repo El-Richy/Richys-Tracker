@@ -62,10 +62,12 @@ export function useHabitActions() {
   const deleteHabit = useCallback(async (id: string) => {
     try {
       cancelReminders(id);
-      await db.habits.delete(id);
-      await db.habitLogs.where('habitId').equals(id).delete();
-      await db.streaks.delete(id);
-      await db.pointEntries.where({ habitId: id, origenTipo: 'habit' }).delete().catch(() => {});
+      await db.transaction('rw', [db.habits, db.habitLogs, db.streaks, db.pointEntries], async () => {
+        await db.pointEntries.where('habitId').equals(id).filter((entry) => entry.origenTipo === 'habit').delete();
+        await db.habitLogs.where('habitId').equals(id).delete();
+        await db.streaks.delete(id);
+        await db.habits.delete(id);
+      });
       removeHabitFromStore(id);
     } catch (err) {
       console.error('Delete habit error:', err);

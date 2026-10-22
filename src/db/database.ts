@@ -57,6 +57,16 @@ export class TrackerDB extends Dexie {
       tasks: 'id, userId, completada, prioridad',
       journalEntries: 'id, userId, creadoEn',
     });
+
+    this.version(6).stores({
+      habits: 'id, userId, nombre',
+      habitLogs: 'id, habitId, fecha, [habitId+fecha]',
+      streaks: 'habitId',
+      badges: 'id',
+      pointEntries: 'id, userId, habitId, fecha, [habitId+fecha]',
+      tasks: 'id, userId, completada, prioridad',
+      journalEntries: 'id, userId, creadoEn',
+    });
   }
 }
 
