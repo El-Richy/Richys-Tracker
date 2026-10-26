@@ -2,11 +2,13 @@ import { useUiStore } from '../store';
 import { useJournal } from '../hooks/useJournal';
 import { JournalForm } from './JournalForm';
 import { QuickNoteModal } from './QuickNoteModal';
+import { useOverlayHistory } from '../lib/overlayHistory';
 
 export function QuickActionsHost() {
   const quickAction = useUiStore((s) => s.quickAction);
   const clearQuickAction = useUiStore((s) => s.clearQuickAction);
   const { createEntry } = useJournal();
+  useOverlayHistory(quickAction !== null, clearQuickAction);
 
   if (quickAction === 'note') {
     return (

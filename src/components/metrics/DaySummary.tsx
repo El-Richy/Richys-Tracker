@@ -24,7 +24,7 @@ export function DaySummary({ resumenHoy }: DaySummaryProps) {
       value: `${resumenHoy.completadosHoy}/${resumenHoy.totalHoy}`,
       subtext: `${resumenHoy.porcentajeHoy}% Completado`,
       icon: '📋',
-      color: '#F0611A',
+      color: 'rgb(var(--accent-rgb))',
     },
     {
       label: 'Racha',

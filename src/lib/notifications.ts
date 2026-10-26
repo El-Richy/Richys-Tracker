@@ -1,7 +1,9 @@
 import { Capacitor } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 
-const isNative = Capacitor.isNativePlatform();
+function isNativePlatform(): boolean {
+  return Capacitor.isNativePlatform();
+}
 
 /**
  * FNV-1a hash del UUID (32 bits) reducido a un espacio de 90 000 valores
@@ -150,8 +152,19 @@ function parseHourMinute(hora: string): { hour: number; minute: number } | null 
 
 // ── API pública ─────────────────────────────────────────
 
+export function notificationBlockReason(): string | null {
+  if (isNativePlatform()) return null;
+  if (typeof window !== 'undefined' && !window.isSecureContext) {
+    return 'En el navegador, las notificaciones solo funcionan por HTTPS. Esta dirección HTTP no puede enviarlas. La app Android sí.';
+  }
+  if (typeof Notification === 'undefined') {
+    return 'Este navegador no puede mostrar notificaciones.';
+  }
+  return null;
+}
+
 export async function requestNotificationPermission(): Promise<boolean> {
-  if (isNative) {
+  if (isNativePlatform()) {
     try {
       const LN = await getLocalNotifications();
       let status = await LN.checkPermissions();
@@ -184,7 +197,7 @@ export async function scheduleHabitReminder(
   const parsed = parseHourMinute(hora);
   if (!parsed) return;
   if (!(await ensureCanSchedule())) return;
-  if (isNative) {
+  if (isNativePlatform()) {
     await nativeSchedule(hashId(habitId, HABIT_PREFIX), "Richy's Tracker", `⏰ Es hora de: ${habitName}`, parsed.hour, parsed.minute);
   } else {
     webSchedule(habitId, parsed.hour, parsed.minute, `⏰ Es hora de: ${habitName}`);
@@ -199,7 +212,7 @@ export async function scheduleTaskReminder(
   const parsed = parseHourMinute(hora);
   if (!parsed) return;
   if (!(await ensureCanSchedule())) return;
-  if (isNative) {
+  if (isNativePlatform()) {
     await nativeSchedule(hashId(taskId, TASK_PREFIX), "Richy's Tracker", `📌 ${taskTitle}`, parsed.hour, parsed.minute);
   } else {
     webSchedule(taskId, parsed.hour, parsed.minute, `📌 ${taskTitle}`);
@@ -211,7 +224,7 @@ export async function scheduleRiskReminder(
   habitName: string,
 ): Promise<void> {
   if (!(await ensureCanSchedule())) return;
-  if (isNative) {
+  if (isNativePlatform()) {
     await nativeSchedule(hashId(habitId + ':risk', RISK_PREFIX), "Richy's Tracker", `⚠️ Tu racha de ${habitName} termina hoy`, 22, 0);
   } else {
     webSchedule(habitId + ':risk', 22, 0, `⚠️ Tu racha de ${habitName} termina hoy`);
@@ -219,7 +232,7 @@ export async function scheduleRiskReminder(
 }
 
 export async function cancelReminders(id: string): Promise<void> {
-  if (isNative) {
+  if (isNativePlatform()) {
     await nativeCancel([
       hashId(id, HABIT_PREFIX),
       hashId(id, TASK_PREFIX),
@@ -232,7 +245,7 @@ export async function cancelReminders(id: string): Promise<void> {
 }
 
 export async function cancelAllReminders(): Promise<void> {
-  if (isNative) {
+  if (isNativePlatform()) {
     await nativeCancelAll();
   } else {
     cancelAllWebTimeouts();
@@ -244,7 +257,7 @@ export async function cancelAllReminders(): Promise<void> {
  * the app returns to the foreground. Web is a no-op.
  */
 export function startNotificationLifecycle(): () => void {
-  if (!isNative) return () => {};
+  if (!isNativePlatform()) return () => {};
 
   let cancelled = false;
   let handle: PluginListenerHandle | undefined;

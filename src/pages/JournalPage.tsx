@@ -7,8 +7,14 @@ import { JournalDetailModal } from '../components/JournalDetailModal';
 import { QuickNoteModal } from '../components/QuickNoteModal';
 import { getLocalDateStr } from '../utils/dateUtils';
 import type { JournalEntry } from '../types';
+import { useOverlayHistory } from '../lib/overlayHistory';
 
-export function JournalPage() {
+interface JournalPageProps {
+  filter: 'journal' | 'note';
+  onFilterChange: (filter: 'journal' | 'note') => void;
+}
+
+export function JournalPage({ filter, onFilterChange }: JournalPageProps) {
   const {
     entries,
     isLoading,
@@ -23,11 +29,17 @@ export function JournalPage() {
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
   const [showQuickNoteForm, setShowQuickNoteForm] = useState(false);
-  const [filter, setFilter] = useState<'journal' | 'note'>('journal');
 
   useEffect(() => {
     loadEntries();
   }, [loadEntries]);
+
+  useOverlayHistory(showForm || showQuickNoteForm || selectedEntry !== null, () => {
+    setShowForm(false);
+    setEditingEntry(null);
+    setShowQuickNoteForm(false);
+    setSelectedEntry(null);
+  });
 
   function handleFormSubmit(data: JournalFormData) {
     if (editingEntry) {
@@ -77,7 +89,7 @@ export function JournalPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 pt-6 pb-24 min-h-[100dvh] flex flex-col">
+    <div className="max-w-lg mx-auto px-4 pt-6 pb-24 flex flex-col">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-text-primary">Mi Diario</h1>
@@ -89,7 +101,7 @@ export function JournalPage() {
         {(['journal', 'note'] as const).map((f) => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => onFilterChange(f)}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
               filter === f 
                 ? 'bg-accent text-white shadow-lg shadow-accent/20' 

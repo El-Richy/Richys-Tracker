@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { motion } from 'framer-motion';
 import { useAuthStore, ACCENT_COLORS } from '../store';
+import { applyAccentColor } from '../theme/accent';
 import { useFormField } from '../hooks/useFormField';
 
 export function OnboardingForm() {
@@ -8,6 +9,10 @@ export function OnboardingForm() {
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(ACCENT_COLORS[0].value);
   const { error, requireField, clearOnChange } = useFormField();
+
+  useEffect(() => {
+    applyAccentColor(color);
+  }, [color]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();

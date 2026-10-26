@@ -111,8 +111,8 @@ export function JournalDetailModal({ entry, onClose }: JournalDetailModalProps) 
               )}
               
               <div className="bg-bg-elevated/30 p-6 rounded-2xl border border-border/50">
-                <p className="text-text-primary text-lg lg:text-xl leading-relaxed whitespace-pre-wrap font-medium font-serif italic opacity-90">
-                  "{entry.texto}"
+                <p className="text-text-primary text-lg leading-relaxed whitespace-pre-wrap font-medium">
+                  {entry.texto}
                 </p>
               </div>
             </div>

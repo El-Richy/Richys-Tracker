@@ -7,6 +7,7 @@ import { useJournal } from '../hooks/useJournal';
 import { JournalDetailModal } from '../components/JournalDetailModal';
 import { type TabId } from '../components/TabBar';
 import type { Habit, JournalEntry } from '../types';
+import { useOverlayHistory } from '../lib/overlayHistory';
 
 interface HomePageProps {
   onNavigate: (tab: TabId) => void;
@@ -37,6 +38,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
   const [greeting, setGreeting] = useState('');
   const [motivator, setMotivator] = useState('');
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+  useOverlayHistory(selectedEntry !== null, () => setSelectedEntry(null));
   const openQuickAction = useUiStore((s) => s.openQuickAction);
 
   useEffect(() => {
@@ -162,7 +164,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
         <div className="space-y-4">
           <div className="h-2.5 bg-bg-elevated rounded-full overflow-hidden border border-border/50">
             <motion.div
-              className="h-full bg-accent shadow-[0_0_15px_rgba(240,97,26,0.3)]"
+              className="h-full bg-accent shadow-[0_0_15px_rgb(var(--accent-rgb)/0.3)]"
               initial={{ width: 0 }}
               animate={{ width: `${progresoPercent}%` }}
               transition={{ duration: 1, ease: 'easeOut' }}

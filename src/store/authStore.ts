@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { LocalUser } from '../types';
+import { applyAccentColor, DEFAULT_ACCENT } from '../theme/accent';
 import { generateId } from '../utils/idUtils';
 
 const STORAGE_KEY = 'richys_local_user';
@@ -15,8 +16,11 @@ export const ACCENT_COLORS = [
 function loadUser(): LocalUser | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const user = raw ? JSON.parse(raw) as LocalUser : null;
+    applyAccentColor(user?.accentColor);
+    return user;
   } catch {
+    applyAccentColor(DEFAULT_ACCENT);
     return null;
   }
 }
@@ -53,6 +57,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
       accentColor,
     };
     saveUser(user);
+    applyAccentColor(accentColor);
     set({ user });
   },
 
@@ -61,11 +66,13 @@ export const useAuthStore = create<AuthState>()((set) => ({
     if (!current) return;
     const updated = { ...current, ...updates };
     saveUser(updated);
+    applyAccentColor(updated.accentColor);
     set({ user: updated });
   },
 
   logout: () => {
     clearUser();
+    applyAccentColor(DEFAULT_ACCENT);
     set({ user: null });
   },
 }));

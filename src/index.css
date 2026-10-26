@@ -4,6 +4,9 @@
 
 html {
   color-scheme: dark;
+  --accent-rgb: 240 97 26;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -15,13 +18,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-main {
-  touch-action: pan-y;
-}
+
 
 /* Focus visible para accesibilidad */
 *:focus-visible {
-  outline: 2px solid #F0611A;
+  outline: 2px solid rgb(var(--accent-rgb));
   outline-offset: 2px;
 }
 

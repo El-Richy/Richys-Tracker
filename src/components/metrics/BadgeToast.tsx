@@ -17,20 +17,17 @@ export function BadgeToast() {
   }, [confirmBadgeSeen]);
 
   useEffect(() => {
-    // Buscamos el primer badge que NO haya sido visto aún
-    const pending = badges.find(b => b.visto === false);
-    
-    if (pending && !toastBadge) {
-      setToastBadge(pending);
-      
-      // Mostrar por 6 segundos (dar tiempo a la animación)
-      const timer = setTimeout(() => {
-        handleDismiss(pending.id);
-      }, 6000);
+    if (toastBadge) return;
+    const pending = badges.find((badge) => badge.visto === false);
+    if (pending) setToastBadge(pending);
+  }, [badges, toastBadge]);
 
-      return () => clearTimeout(timer);
-    }
-  }, [badges, toastBadge, handleDismiss]);
+  useEffect(() => {
+    if (!toastBadge) return;
+    const id = toastBadge.id;
+    const timer = window.setTimeout(() => handleDismiss(id), 6000);
+    return () => window.clearTimeout(timer);
+  }, [toastBadge, handleDismiss]);
 
   return (
     <AnimatePresence>

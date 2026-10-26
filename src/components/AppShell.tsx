@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { TabBar, TAB_ORDER, type TabId } from './TabBar';
+import { TabBar, type TabId } from './TabBar';
 import { BadgeToast } from './metrics/BadgeToast';
 import { Toast } from './Toast';
 import { HomePage } from '../pages/HomePage';
@@ -10,6 +10,8 @@ import { JournalPage } from '../pages/JournalPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { useTabSwipe } from '../hooks/useTabSwipe';
 import { selectionTick } from '../lib/haptics';
+import { swipeDestination, type JournalPane } from '../utils/journalSwipe';
+import { overlayBackIsOpen } from '../lib/overlayHistory';
 import { QuickActionsHost } from './QuickActionsHost';
 
 /**
@@ -18,6 +20,7 @@ import { QuickActionsHost } from './QuickActionsHost';
  */
 export function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>('inicio');
+  const [journalPane, setJournalPane] = useState<JournalPane>('journal');
   const [activeSubPage, setActiveSubPage] = useState<'metrics' | null>(null);
   const shellRef = useRef<HTMLDivElement>(null);
 
@@ -27,6 +30,7 @@ export function AppShell() {
     }
 
     const handlePopState = () => {
+      if (overlayBackIsOpen()) return;
       if (activeSubPage) {
         setActiveSubPage(null);
       } else if (activeTab !== 'inicio') {
@@ -41,7 +45,10 @@ export function AppShell() {
   const activeTabRef = useRef(activeTab);
   activeTabRef.current = activeTab;
 
-  const handleTabChange = useCallback((tab: TabId) => {
+  const journalPaneRef = useRef(journalPane);
+  journalPaneRef.current = journalPane;
+
+  const goToTab = useCallback((tab: TabId) => {
     if (tab !== activeTabRef.current) {
       window.history.pushState({ tab, sub: null }, "");
       selectionTick();
@@ -50,22 +57,32 @@ export function AppShell() {
     setActiveSubPage(null);
   }, []);
 
+  const handleTabChange = useCallback((tab: TabId) => {
+    if (tab === 'journal' && journalPaneRef.current !== 'journal') {
+      setJournalPane('journal');
+      if (tab === activeTabRef.current) selectionTick();
+    }
+    goToTab(tab);
+  }, [goToTab]);
+
   const onSwipe = useCallback((direction: -1 | 1) => {
     if (activeSubPage) {
       if (direction === -1) setActiveSubPage(null);
       return;
     }
-    const idx = TAB_ORDER.indexOf(activeTab);
-    const next = idx + direction;
-    if (next >= 0 && next < TAB_ORDER.length) {
-      handleTabChange(TAB_ORDER[next]);
-    }
-  }, [activeSubPage, activeTab, handleTabChange]);
+    const destination = swipeDestination(activeTab, journalPane, direction);
+    if (!destination) return;
+    const paneChanged = destination.journalPane !== journalPane;
+    const tabChanged = destination.tab !== activeTab;
+    if (paneChanged) setJournalPane(destination.journalPane);
+    if (tabChanged) goToTab(destination.tab);
+    else if (paneChanged) selectionTick();
+  }, [activeSubPage, activeTab, goToTab, journalPane]);
 
   useTabSwipe(shellRef, onSwipe);
 
   return (
-    <div ref={shellRef} className="min-h-screen bg-bg-primary">
+    <div ref={shellRef} className="min-h-screen bg-bg-primary touch-pan-y">
       {/* Badge toast global */}
       <BadgeToast />
 
@@ -87,7 +104,9 @@ export function AppShell() {
             <HomePage onNavigate={handleTabChange} />
           )}
           {activeTab === 'tasks' && <TasksPage />}
-          {activeTab === 'journal' && <JournalPage />}
+          {activeTab === 'journal' && (
+            <JournalPage filter={journalPane} onFilterChange={setJournalPane} />
+          )}
           {activeTab === 'habits' && <HabitsPage />}
           {activeTab === 'settings' && (
             <SettingsPage

@@ -162,12 +162,12 @@ export function JournalCard({ entry, index = 0, onDelete, onEdit, onOpen, onEmbe
         {/* Título y Texto */}
         <div className="relative">
           {entry.titulo && (
-            <h4 className="text-sm font-bold text-text-primary mb-1">
+            <h4 className="text-base font-bold text-text-primary mb-1">
               {entry.titulo}
             </h4>
           )}
           <p
-            className={`text-sm text-text-primary leading-relaxed transition-all ${
+            className={`text-base text-text-primary leading-relaxed transition-all ${
               !isExpanded ? 'line-clamp-3' : ''
             }`}
           >

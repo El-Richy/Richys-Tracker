@@ -33,8 +33,8 @@ export function MonthlyChart({ data }: MonthlyChartProps) {
         <AreaChart data={data}>
           <defs>
             <linearGradient id="gradientArea" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={colors.accent} stopOpacity={0.3} />
-              <stop offset="100%" stopColor={colors.accent} stopOpacity={0} />
+              <stop offset="0%" stopColor="rgb(var(--accent-rgb))" stopOpacity={0.3} />
+              <stop offset="100%" stopColor="rgb(var(--accent-rgb))" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid
@@ -70,7 +70,7 @@ export function MonthlyChart({ data }: MonthlyChartProps) {
           <Area
             type="monotone"
             dataKey="porcentaje"
-            stroke={colors.accent}
+            stroke="rgb(var(--accent-rgb))"
             strokeWidth={2}
             fill="url(#gradientArea)"
           />

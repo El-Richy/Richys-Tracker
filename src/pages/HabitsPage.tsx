@@ -4,6 +4,7 @@ import { useHabits } from '../hooks/useHabits';
 import { HabitCard } from '../components/HabitCard';
 import { HabitForm, type HabitFormData } from '../components/HabitForm';
 import type { Habit } from '../types';
+import { useOverlayHistory } from '../lib/overlayHistory';
 
 /**
  * Pantalla principal — lista de hábitos con FAB para crear.
@@ -36,6 +37,11 @@ export function HabitsPage() {
     editHabit(editingHabit.id, data);
     setEditingHabit(null);
   }
+
+  useOverlayHistory(showForm || editingHabit !== null, () => {
+    setShowForm(false);
+    setEditingHabit(null);
+  });
 
   function handleDelete(id: string) {
     setDeletingHabitId(id);

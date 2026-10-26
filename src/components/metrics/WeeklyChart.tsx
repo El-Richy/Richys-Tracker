@@ -67,7 +67,7 @@ export function WeeklyChart({ data, habitColors }: WeeklyChartProps) {
               fontSize: 12,
               color: colors.textPrimary,
             }}
-            cursor={{ fill: `${colors.accent}10` }}
+            cursor={{ fill: 'rgb(var(--accent-rgb) / 0.06)' }}
           />
           {habitColors.map(({ nombre, color }) => (
             <Bar

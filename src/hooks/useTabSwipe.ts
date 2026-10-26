@@ -1,12 +1,13 @@
 import { useEffect, useRef, type RefObject } from 'react';
+import { classifySwipe } from '../utils/swipeAxis';
 
-const MIN_DISTANCE = 56;
+const MIN_DISTANCE = 48;
 const LEFT_EDGE_GUARD_PX = 16;
 
 /**
- * Horizontal tab swipe without translating the page.
- * Listeners stay bound for the life of the shell node so click suppression
- * is not dropped when onSwipe identity changes.
+ * Horizontal tab swipe. Listeners stay on the shell for its whole life.
+ * A horizontal move claims the gesture so vertical scroll cannot cancel it.
+ * Empty areas of the shell count: the listener is on the shell, not on cards.
  */
 export function useTabSwipe(
   shellRef: RefObject<HTMLElement | null>,
@@ -27,7 +28,7 @@ export function useTabSwipe(
     let pointerId: number | null = null;
 
     const isIgnoredTarget = (target: EventTarget | null) => {
-      if (!(target instanceof HTMLElement)) return false;
+      if (!(target instanceof Element)) return false;
       return Boolean(
         target.closest('input, textarea, select, [contenteditable], [data-no-swipe]'),
       );
@@ -48,25 +49,41 @@ export function useTabSwipe(
       tracking = true;
       lockedHorizontal = false;
       pointerId = event.pointerId;
+    };
+
+    const claimHorizontal = (event: PointerEvent) => {
+      lockedHorizontal = true;
       try {
         root.setPointerCapture(event.pointerId);
       } catch {
-        // Capture is best-effort when the event did not originate on root.
+        // Capture is best-effort. touchmove still preventDefault below.
       }
     };
 
     const onPointerMove = (event: PointerEvent) => {
       if (!tracking || pointerId !== event.pointerId) return;
-      const dx = event.clientX - startX;
-      const dy = event.clientY - startY;
       if (lockedHorizontal) return;
-      if (Math.abs(dy) > Math.abs(dx) * 1.15) {
+      const axis = classifySwipe(event.clientX - startX, event.clientY - startY);
+      if (axis === 'vertical') {
         clearTracking();
         return;
       }
-      if (Math.abs(dx) >= Math.abs(dy) * 1.15 && Math.abs(dx) >= 8) {
+      if (axis === 'horizontal') claimHorizontal(event);
+    };
+
+    const onTouchMove = (event: TouchEvent) => {
+      if (!tracking || event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      if (!lockedHorizontal) {
+        const axis = classifySwipe(touch.clientX - startX, touch.clientY - startY);
+        if (axis === 'vertical') {
+          clearTracking();
+          return;
+        }
+        if (axis !== 'horizontal') return;
         lockedHorizontal = true;
       }
+      if (event.cancelable) event.preventDefault();
     };
 
     const onPointerUp = (event: PointerEvent) => {
@@ -75,9 +92,7 @@ export function useTabSwipe(
         return;
       }
       const dx = event.clientX - startX;
-      const dy = event.clientY - startY;
-      const horizontal =
-        lockedHorizontal || Math.abs(dx) >= Math.abs(dy) * 1.15;
+      const horizontal = lockedHorizontal || classifySwipe(dx, event.clientY - startY) === 'horizontal';
       clearTracking();
       if (!horizontal || Math.abs(dx) < MIN_DISTANCE) return;
       consumed = true;
@@ -85,6 +100,7 @@ export function useTabSwipe(
     };
 
     const onPointerCancel = () => {
+      if (lockedHorizontal) return;
       clearTracking();
     };
 
@@ -97,12 +113,14 @@ export function useTabSwipe(
 
     root.addEventListener('pointerdown', onPointerDown);
     root.addEventListener('pointermove', onPointerMove);
+    root.addEventListener('touchmove', onTouchMove, { passive: false });
     root.addEventListener('pointerup', onPointerUp);
     root.addEventListener('pointercancel', onPointerCancel);
     root.addEventListener('click', onClickCapture, true);
     return () => {
       root.removeEventListener('pointerdown', onPointerDown);
       root.removeEventListener('pointermove', onPointerMove);
+      root.removeEventListener('touchmove', onTouchMove);
       root.removeEventListener('pointerup', onPointerUp);
       root.removeEventListener('pointercancel', onPointerCancel);
       root.removeEventListener('click', onClickCapture, true);

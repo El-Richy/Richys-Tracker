@@ -19,7 +19,7 @@ export default {
         'safe-top': 'env(safe-area-inset-top, 0px)',
       },
       colors: {
-        accent: colors.accent,
+        accent: 'rgb(var(--accent-rgb) / <alpha-value>)',
         secondary: colors.secondary,
         'bg-primary': colors.bgPrimary,
         'bg-card': colors.bgCard,

@@ -8,7 +8,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        accent: '#F0611A',
+        accent: 'rgb(var(--accent-rgb) / <alpha-value>)',
         secondary: '#E8C99A',
         'bg-primary': '#0F0F0F',
         'bg-card': '#1A1A1A',

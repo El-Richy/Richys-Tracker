@@ -4,6 +4,7 @@ import { useTasks } from '../hooks/useTasks';
 import { TaskCard } from '../components/TaskCard';
 import { TaskForm, type TaskFormData } from '../components/TaskForm';
 import type { Task } from '../types';
+import { useOverlayHistory } from '../lib/overlayHistory';
 
 export function TasksPage() {
   const {
@@ -26,6 +27,11 @@ export function TasksPage() {
   useEffect(() => {
     loadTasks();
   }, [loadTasks]);
+
+  useOverlayHistory(showForm || editingTask !== null, () => {
+    setShowForm(false);
+    setEditingTask(null);
+  });
 
   const pendingTasks = tasks.filter(t => !t.completada);
   const completedTasks = tasks.filter(t => t.completada);

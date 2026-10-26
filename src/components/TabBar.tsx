@@ -1,5 +1,6 @@
 import { useRef, type MouseEvent, type PointerEvent } from 'react';
 import { motion } from 'framer-motion';
+import { tabIndexFromClientX } from '../utils/swipeAxis';
 
 export type TabId = 'inicio' | 'tasks' | 'journal' | 'habits' | 'settings';
 
@@ -26,21 +27,13 @@ interface TabBarProps {
   onTabChange: (tab: TabId) => void;
 }
 
-function tabIndexFromClientX(clientX: number, pill: HTMLElement): number {
-  const rect = pill.getBoundingClientRect();
-  const width = rect.width;
-  if (width <= 0) return 0;
-  const slot = width / TAB_ORDER.length;
-  const x = Math.min(Math.max(clientX - rect.left, 0), width - 1);
-  return Math.min(TAB_ORDER.length - 1, Math.max(0, Math.floor(x / slot)));
-}
-
 export function TabBar({ activeTab, onTabChange }: TabBarProps) {
   const pillRef = useRef<HTMLDivElement>(null);
   const scrubRef = useRef({
     pointerId: null as number | null,
     startX: 0,
     dragging: false,
+    suppressClick: false,
   });
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
@@ -50,6 +43,7 @@ export function TabBar({ activeTab, onTabChange }: TabBarProps) {
     scrubRef.current.pointerId = event.pointerId;
     scrubRef.current.startX = event.clientX;
     scrubRef.current.dragging = false;
+    scrubRef.current.suppressClick = false;
     try {
       pill.setPointerCapture(event.pointerId);
     } catch {
@@ -66,27 +60,25 @@ export function TabBar({ activeTab, onTabChange }: TabBarProps) {
       scrub.dragging = true;
     }
     if (!scrub.dragging) return;
-    const idx = tabIndexFromClientX(event.clientX, pill);
+    if (event.cancelable) event.preventDefault();
+    const idx = tabIndexFromClientX(event.clientX, pill.getBoundingClientRect(), TAB_ORDER.length);
     const next = TAB_ORDER[idx];
     if (next !== activeTab) onTabChange(next);
   }
 
-  function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
-    if (scrubRef.current.pointerId !== event.pointerId) return;
-    scrubRef.current.pointerId = null;
-  }
-
-  function handlePointerCancel(event: PointerEvent<HTMLDivElement>) {
-    if (scrubRef.current.pointerId !== event.pointerId) return;
-    scrubRef.current.pointerId = null;
-    scrubRef.current.dragging = false;
+  function endScrub(event: PointerEvent<HTMLDivElement>) {
+    const scrub = scrubRef.current;
+    if (scrub.pointerId !== event.pointerId) return;
+    if (scrub.dragging) scrub.suppressClick = true;
+    scrub.pointerId = null;
+    scrub.dragging = false;
   }
 
   function handleClickCapture(event: MouseEvent<HTMLDivElement>) {
-    if (!scrubRef.current.dragging) return;
+    if (!scrubRef.current.suppressClick) return;
+    scrubRef.current.suppressClick = false;
     event.preventDefault();
     event.stopPropagation();
-    scrubRef.current.dragging = false;
   }
 
   return (
@@ -101,10 +93,10 @@ export function TabBar({ activeTab, onTabChange }: TabBarProps) {
         data-no-swipe
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
+        onPointerUp={endScrub}
+        onPointerCancel={endScrub}
         onClickCapture={handleClickCapture}
-        className="relative flex w-full max-w-sm pointer-events-auto touch-pan-x rounded-full bg-bg-card border border-border py-1.5 px-1.5 shadow-lg"
+        className="relative flex w-full max-w-sm pointer-events-auto touch-none rounded-full bg-bg-card border border-border py-1.5 px-1.5 shadow-lg"
       >
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;

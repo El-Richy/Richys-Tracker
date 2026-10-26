@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Habit, Subtarea } from '../types';
+import { notificationBlockReason, requestNotificationPermission } from '../lib/notifications';
+import { lastGrapheme } from '../utils/grapheme';
 import { generateId } from '../utils/idUtils';
 
 /** Colores predefinidos para elegir */
@@ -15,13 +17,6 @@ const PRESET_ICONS = [
   '🥗', '🎨', '🎵', '💻', '🧹', '🌅', '📱', '⭐',
   '🧠', '❤️', '🍎', '🚿', '🦷', '🛏️', '🚶', '🚴',
 ];
-
-function lastGrapheme(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  const chars = Array.from(trimmed);
-  return chars[chars.length - 1] ?? '';
-}
 
 /** Días de la semana (abreviados) */
 const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -66,13 +61,22 @@ export function HabitForm({ habit, onSubmit, onClose }: HabitFormProps) {
 
   const isEdit = habit !== null;
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
 
     if (!nombre.trim()) {
       setError('El nombre es obligatorio');
       return;
+    }
+
+    if (recordatorioHora) {
+      const blocked = notificationBlockReason();
+      if (blocked) {
+        alert(blocked);
+      } else {
+        await requestNotificationPermission();
+      }
     }
 
     onSubmit({

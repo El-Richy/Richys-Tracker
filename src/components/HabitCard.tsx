@@ -109,7 +109,7 @@ export function HabitCard({
             {last7Days.map((day: { completado: boolean; dia: string; }, i: number) => (
               <div key={i} className="flex flex-col items-center gap-1">
                 <div className={`w-2.5 h-2.5 rounded-full ${
-                  day.completado ? 'bg-accent shadow-[0_0_8px_rgba(240,97,26,0.3)]' : 'bg-bg-elevated'
+                  day.completado ? 'bg-accent shadow-[0_0_8px_rgb(var(--accent-rgb)/0.3)]' : 'bg-bg-elevated'
                 }`} />
                 <span className="text-[10px] text-text-secondary/60 leading-none">
                   {day.dia}

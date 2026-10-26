@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task, Subtarea } from '../types';
+import { notificationBlockReason, requestNotificationPermission } from '../lib/notifications';
 import { generateId } from '../utils/idUtils';
 
 interface TaskFormProps {
@@ -35,11 +36,19 @@ export function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
 
   const isEdit = task !== null;
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!titulo.trim()) {
       setError('El título es obligatorio');
       return;
+    }
+    if (recordatorioHora) {
+      const blocked = notificationBlockReason();
+      if (blocked) {
+        alert(blocked);
+      } else {
+        await requestNotificationPermission();
+      }
     }
     onSubmit({
       titulo: titulo.trim(),
