@@ -11,7 +11,7 @@ import { SettingsPage } from '../pages/SettingsPage';
 import { useTabSwipe } from '../hooks/useTabSwipe';
 import { selectionTick } from '../lib/haptics';
 import { swipeDestination, type JournalPane } from '../utils/journalSwipe';
-import { overlayBackIsOpen } from '../lib/overlayHistory';
+import { consumeOverlayPop } from '../lib/overlayHistory';
 import { QuickActionsHost } from './QuickActionsHost';
 
 /**
@@ -30,7 +30,7 @@ export function AppShell() {
     }
 
     const handlePopState = () => {
-      if (overlayBackIsOpen()) return;
+      if (consumeOverlayPop()) return;
       if (activeSubPage) {
         setActiveSubPage(null);
       } else if (activeTab !== 'inicio') {

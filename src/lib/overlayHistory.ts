@@ -1,10 +1,24 @@
 import { useEffect, useRef } from 'react';
 
 let openOverlays = 0;
+let expectingClosePop = false;
+
+/** Stay when the pop belongs to a sheet, including a close that already dropped the count. */
+export function overlayPopAction(open: number, expectingClose: boolean): 'stay' | 'navigate' {
+  if (open > 0 || expectingClose) return 'stay';
+  return 'navigate';
+}
 
 /** True while a create/edit sheet owns the next system Back press. */
 export function overlayBackIsOpen(): boolean {
-  return openOverlays > 0;
+  return overlayPopAction(openOverlays, expectingClosePop) === 'stay';
+}
+
+/** AppShell calls this from popstate. A programmatic close consumes one ignored pop. */
+export function consumeOverlayPop(): boolean {
+  const stay = overlayBackIsOpen();
+  if (openOverlays === 0 && expectingClosePop) expectingClosePop = false;
+  return stay;
 }
 
 /**
@@ -36,8 +50,9 @@ export function useOverlayHistory(isOpen: boolean, onClose: () => void): void {
       window.removeEventListener('popstate', onPop);
       if (!ownsEntry.current) return;
       ownsEntry.current = false;
-      window.history.back();
+      expectingClosePop = true;
       openOverlays = Math.max(0, openOverlays - 1);
+      window.history.back();
     };
   }, [isOpen]);
 }
