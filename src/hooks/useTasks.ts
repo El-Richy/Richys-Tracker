@@ -63,7 +63,7 @@ export function useTasks() {
     addTaskToStore(task);
 
     if (task.recordatorioHora) {
-      void scheduleTaskReminder(task.id, task.titulo, task.recordatorioHora);
+      void scheduleTaskReminder(task.id, task.titulo, task.recordatorioHora, true);
     }
   }, [user, addTaskToStore]);
 
@@ -76,7 +76,7 @@ export function useTasks() {
       if (updatedTask.completada || !updatedTask.recordatorioHora) {
         void cancelReminders(id);
       } else {
-        void scheduleTaskReminder(updatedTask.id, updatedTask.titulo, updatedTask.recordatorioHora);
+        void scheduleTaskReminder(updatedTask.id, updatedTask.titulo, updatedTask.recordatorioHora, true);
       }
     }
   }, [updateTaskInStore]);

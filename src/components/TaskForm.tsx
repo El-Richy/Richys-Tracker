@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task, Subtarea } from '../types';
-import { notificationBlockReason, requestNotificationPermission } from '../lib/notifications';
+import { notificationBlockReason } from '../lib/notifications';
 import { generateId } from '../utils/idUtils';
 
 interface TaskFormProps {
@@ -36,19 +36,11 @@ export function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
 
   const isEdit = task !== null;
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  function handleSubmit(e?: { preventDefault(): void }) {
+    e?.preventDefault();
     if (!titulo.trim()) {
       setError('El título es obligatorio');
       return;
-    }
-    if (recordatorioHora) {
-      const blocked = notificationBlockReason();
-      if (blocked) {
-        alert(blocked);
-      } else {
-        await requestNotificationPermission();
-      }
     }
     onSubmit({
       titulo: titulo.trim(),
@@ -58,6 +50,10 @@ export function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
       recordatorioHora: recordatorioHora || '',
       subtareas,
     });
+    if (recordatorioHora) {
+      const blocked = notificationBlockReason();
+      if (blocked) alert(blocked);
+    }
   }
 
   function addSubtask() {
@@ -90,7 +86,7 @@ export function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
           exit={{ y: 100, opacity: 0 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <form onSubmit={handleSubmit} className="p-5 space-y-5">
+          <form noValidate onSubmit={handleSubmit} className="p-5 space-y-5">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-text-primary">
                 {isEdit ? 'Editar Tarea' : 'Crear Tarea'}
@@ -194,7 +190,8 @@ export function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
             {error && <p className="text-danger text-sm bg-danger/10 p-3 rounded-lg text-center">{error}</p>}
 
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               className="w-full py-4 rounded-lg bg-accent text-white font-bold hover:bg-accent/90 transition-colors shadow-lg shadow-accent/20"
             >
               {isEdit ? 'Guardar' : 'Crear'}

@@ -35,7 +35,7 @@ export function useHabitActions() {
     addHabitToStore(habit);
 
     if (habit.recordatorioHora) {
-      scheduleHabitReminder(habit.id, habit.nombre, habit.recordatorioHora);
+      void scheduleHabitReminder(habit.id, habit.nombre, habit.recordatorioHora, true);
     }
 
     return habit;
@@ -53,7 +53,7 @@ export function useHabitActions() {
       if (updates.recordatorioHora) {
         const habit = useHabitStore.getState().habits.find(h => h.id === id);
         if (habit) {
-          scheduleHabitReminder(habit.id, habit.nombre, updates.recordatorioHora);
+          void scheduleHabitReminder(habit.id, habit.nombre, updates.recordatorioHora, true);
         }
       }
     }

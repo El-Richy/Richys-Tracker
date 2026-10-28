@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Habit, Subtarea } from '../types';
-import { notificationBlockReason, requestNotificationPermission } from '../lib/notifications';
+import { notificationBlockReason } from '../lib/notifications';
 import { lastGrapheme } from '../utils/grapheme';
 import { generateId } from '../utils/idUtils';
 
@@ -61,22 +61,13 @@ export function HabitForm({ habit, onSubmit, onClose }: HabitFormProps) {
 
   const isEdit = habit !== null;
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  function handleSubmit(e?: { preventDefault(): void }) {
+    e?.preventDefault();
     setError(null);
 
     if (!nombre.trim()) {
       setError('El nombre es obligatorio');
       return;
-    }
-
-    if (recordatorioHora) {
-      const blocked = notificationBlockReason();
-      if (blocked) {
-        alert(blocked);
-      } else {
-        await requestNotificationPermission();
-      }
     }
 
     onSubmit({
@@ -89,6 +80,11 @@ export function HabitForm({ habit, onSubmit, onClose }: HabitFormProps) {
       subtareas,
       prioridad,
     });
+
+    if (recordatorioHora) {
+      const blocked = notificationBlockReason();
+      if (blocked) alert(blocked);
+    }
   }
 
   function toggleDay(day: number) {
@@ -130,7 +126,7 @@ export function HabitForm({ habit, onSubmit, onClose }: HabitFormProps) {
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <form onSubmit={handleSubmit} className="p-5 space-y-5">
+          <form noValidate onSubmit={handleSubmit} className="p-5 space-y-5">
             {/* Título */}
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-text-primary">
@@ -358,7 +354,8 @@ export function HabitForm({ habit, onSubmit, onClose }: HabitFormProps) {
 
             {/* Submit */}
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               className="w-full py-3 rounded-lg bg-accent text-white font-semibold hover:bg-accent/90 active:scale-[0.98] transition-all"
             >
               {isEdit ? 'Guardar' : 'Crear'}
