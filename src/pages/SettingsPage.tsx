@@ -9,6 +9,7 @@ import {
   shareOrDownloadBackup,
   type BackupPayload,
 } from '../lib/backup';
+import { cancelAllReminders } from '../lib/notifications';
 
 const MetricsPage = lazy(() =>
   import('./MetricsPage').then((mod) => ({ default: mod.MetricsPage }))
@@ -61,6 +62,7 @@ export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageP
 
   async function applyBackup(data: BackupPayload) {
     if (!user) return;
+    await cancelAllReminders();
     await db.transaction('rw', db.tables, async () => {
       await db.habits.clear();
       await db.habitLogs.clear();
@@ -152,6 +154,7 @@ export function SettingsPage({ activeSubPage, onNavigateSubPage }: SettingsPageP
   const resetApp = async () => {
     if (!user) return;
     try {
+      await cancelAllReminders();
       await db.delete();
       await db.open();
       localStorage.clear();

@@ -3,7 +3,6 @@ import { useAuthStore, useUiStore } from './store';
 import { SplashScreen } from './components/SplashScreen';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { AppShell } from './components/AppShell';
-import { startNotificationLifecycle } from './lib/notifications';
 import type { QuickAction } from './store/uiStore';
 
 function shortcutFromUrl(url?: string | null): QuickAction | null {
@@ -24,8 +23,6 @@ function App() {
       void SplashScreen.hide().catch(() => {});
     });
   }, [initialize]);
-
-  useEffect(() => startNotificationLifecycle(), []);
 
   useEffect(() => {
     let handle: { remove: () => Promise<void> } | undefined;

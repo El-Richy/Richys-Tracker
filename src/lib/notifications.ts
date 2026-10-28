@@ -168,18 +168,12 @@ export function notificationBlockReason(): string | null {
   return null;
 }
 
-export async function requestNotificationPermission(): Promise<boolean> {
-  if (isNativePlatform()) return true;
-
+async function ensureCanSchedule(): Promise<boolean> {
   if (!('Notification' in window)) return false;
   if (Notification.permission === 'granted') return true;
   if (Notification.permission === 'denied') return false;
   const result = await Notification.requestPermission();
   return result === 'granted';
-}
-
-async function ensureCanSchedule(): Promise<boolean> {
-  return requestNotificationPermission();
 }
 
 export async function scheduleHabitReminder(
@@ -247,7 +241,3 @@ export async function cancelAllReminders(): Promise<void> {
   }
 }
 
-/** Native reminders stay in the tray until the user dismisses them. */
-export function startNotificationLifecycle(): () => void {
-  return () => {};
-}

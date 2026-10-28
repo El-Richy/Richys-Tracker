@@ -15,7 +15,7 @@ export function useHabits() {
   const isLoading = useHabitStore((s) => s.isLoading);
   const pointEntries = useHabitStore((s) => s.pointEntries);
 
-  const { refresh } = useHabitSync();
+  useHabitSync();
   const { createHabit, editHabit, deleteHabit } = useHabitActions();
   const { recalcularTodasLasRachas, procesarPostCheck, confirmBadgeSeen } = useHabitImpact();
   const { toggleCheck, toggleSubtask, addSubtask } = useHabitProgress({ onPostCheck: procesarPostCheck });
@@ -65,7 +65,6 @@ export function useHabits() {
     getLogForHabit,
     getStreakForHabit,
     confirmBadgeSeen,
-    refresh,
     recalcularTodasLasRachas
   };
 }

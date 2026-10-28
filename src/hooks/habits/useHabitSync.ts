@@ -67,5 +67,4 @@ export function useHabitSync() {
     setTotalPoints(calcularTotalPuntos(local));
   }
 
-  return { refresh: async () => {} };
 }

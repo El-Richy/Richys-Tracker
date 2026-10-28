@@ -33,12 +33,6 @@ export function calcularPuntosHabito(rachaActual: number): number {
   return PUNTOS.COMPLETAR_HABITO;
 }
 
-export function etiquetaMultiplicador(rachaActual: number): string | null {
-  if (rachaActual >= 30) return '×3';
-  if (rachaActual >= 7) return '×2';
-  return null;
-}
-
 export function crearEntradaPuntos(
   userId: string,
   puntos: number,

@@ -31,11 +31,15 @@ describe('native reminder alarm path', () => {
 
   it('declares USE_EXACT_ALARM and does not clear the tray', () => {
     assert.match(manifest, /android\.permission\.USE_EXACT_ALARM/);
-    assert.match(js, /return \(\) => \{\}/);
-    assert.doesNotMatch(js, /removeAllDeliveredNotifications/);
+    assert.doesNotMatch(js, /startNotificationLifecycle|removeAllDeliveredNotifications/);
   });
 
   it('queues cancel on the same native scheduler as schedule', () => {
     assert.match(js, /async function nativeCancel[\s\S]*enqueueNativeSchedule/);
+  });
+
+  it('cancels all reminders on reset and import', () => {
+    const settings = readFileSync('src/pages/SettingsPage.tsx', 'utf8');
+    assert.equal((settings.match(/await cancelAllReminders\(\)/g) || []).length, 2);
   });
 });
