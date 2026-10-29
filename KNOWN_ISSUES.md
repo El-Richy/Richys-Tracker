@@ -1,25 +1,25 @@
-# Known issues (v1 freeze)
+# Problemas conocidos (v1 congelada)
 
-Items from the publish audit that stay open. Not blockers for the frozen portfolio snapshot.
+Quedaron abiertos en el audit de publicación. No bloquean el snapshot de portafolio.
 
-## H10 — Dexie versions 4 and 5
+## H10 — Versiones 4 y 5 de Dexie
 
-`src/db/database.ts` versions 4 and 5 repeat the version 3 stores with no schema change. Do not delete them: Dexie already applied those versions on existing databases.
+En `src/db/database.ts` las versiones 4 y 5 copian los stores de la 3 sin cambiar el esquema. No las borres: Dexie ya las aplicó en bases existentes.
 
-## H11 — `npm audit` (toolchain)
+## H11 — `npm audit` (herramientas de build)
 
-`npm audit` reports high issues in Vite 6.4.1 and other build-time packages (dev server path traversal, PostCSS, lodash, etc.). They are not APK/PWA runtime RCE. Do not run `npm audit fix --force`. Revisit on a later Vite 6/7 pin.
+`npm audit` marca issues high en Vite 6.4.1 y otros paquetes de build (dev server, PostCSS, lodash, etc.). No son RCE en la APK ni en la PWA ya construida. No corras `npm audit fix --force`. Revisarlo cuando se actualice Vite.
 
 ## H12 — `USE_EXACT_ALARM`
 
-`android/app/src/main/AndroidManifest.xml` declares `USE_EXACT_ALARM` so daily reminders can fire on time. Fine for GitHub / sideload. Google Play may ask for a calendar/alarm justification.
+`android/app/src/main/AndroidManifest.xml` declara `USE_EXACT_ALARM` para que los recordatorios diarios lleguen a horario. En GitHub o sideload no hay problema. Play puede pedir justificación de calendario/alarma.
 
 ## PWA vs Android
 
-- Browser notifications need a secure context. HTTP LAN preview cannot show them; the Android app can.
-- The PWA and the APK do not share Dexie. Move data with the JSON backup (25 MB cap). Journal photos live inside that JSON.
+- Las notificaciones del navegador piden un contexto seguro. En HTTP local no salen; en la app Android sí.
+- La PWA y la APK no comparten Dexie. Los datos se pasan con el respaldo JSON (tope 25 MB). Las fotos del diario van dentro de ese JSON.
 
-## Other
+## Otros
 
-- Journal photos are stored as data URLs in IndexedDB and in the backup file.
-- `android/app/build` is generated and gitignored; lint must not scan it (handled in eslint ignores).
+- Las fotos del diario se guardan como data URL en IndexedDB y en el archivo de respaldo.
+- `android/app/build` es generado y está en `.gitignore`; el lint no debe escanearlo (ya está en los ignores de ESLint).
