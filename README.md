@@ -4,6 +4,8 @@ Tracker de hábitos offline. Los datos viven en el dispositivo (IndexedDB / Dexi
 
 También corre como PWA y como app Android con Capacitor.
 
+PWA: [https://el-richy.github.io/Richys-Tracker/](https://el-richy.github.io/Richys-Tracker/)
+
 ## Requisitos
 
 - Node.js 22 o superior
