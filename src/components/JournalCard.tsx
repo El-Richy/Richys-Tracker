@@ -5,6 +5,7 @@ import type { JournalEntry } from '../types';
 interface JournalCardProps {
   entry: JournalEntry;
   index?: number;
+  deferOffscreen?: boolean;
   onDelete: () => void;
   onEdit: () => void;
   onOpen: () => void;
@@ -19,7 +20,7 @@ const MOOD_EMOJIS: Record<number, string> = {
   5: '😄',
 };
 
-export function JournalCard({ entry, index = 0, onDelete, onEdit, onOpen, onEmbed }: JournalCardProps) {
+export function JournalCard({ entry, index = 0, deferOffscreen = false, onDelete, onEdit, onOpen, onEmbed }: JournalCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
@@ -61,7 +62,7 @@ export function JournalCard({ entry, index = 0, onDelete, onEdit, onOpen, onEmbe
   return (
     <motion.div
       layout
-      className="bg-bg-card rounded-xl border border-border cursor-pointer hover:bg-bg-elevated/30 transition-colors relative"
+      className={`bg-bg-card rounded-xl border border-border cursor-pointer hover:bg-bg-elevated/30 transition-colors relative${deferOffscreen ? ' journal-card-deferred' : ''}`}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}

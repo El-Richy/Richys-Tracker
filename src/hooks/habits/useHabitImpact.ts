@@ -79,17 +79,22 @@ export function useHabitImpact() {
 
     const nuevaRacha = calcularRacha(habit, fechasCompletas, existingStreak?.rachaMaxima ?? 0);
     upsertStreakInStore(nuevaRacha);
-    await db.streaks.put(nuevaRacha);
 
-    if (completado) {
+    await db.transaction('rw', [db.streaks, db.pointEntries], async () => {
+      await db.streaks.put(nuevaRacha);
+
+      if (!completado) {
+        await borrarPuntosDeHoy(habitId, targetDate);
+        return;
+      }
+
       const puntosBase = calcularPuntosHabito(nuevaRacha.rachaActual);
+      const sameDay = await db.pointEntries
+        .where('[habitId+fecha]')
+        .equals([habitId, targetDate])
+        .toArray();
 
-      const existeBase = await db.pointEntries
-        .where('habitId').equals(habitId)
-        .filter(e => e.fecha === targetDate && e.puntos === puntosBase)
-        .count();
-
-      if (existeBase === 0) {
+      if (!sameDay.some((entry) => entry.puntos === puntosBase)) {
         const entrada = crearEntradaPuntos(
           user.id,
           puntosBase,
@@ -99,18 +104,15 @@ export function useHabitImpact() {
           'habit'
         );
         addPointEntryInStore(entrada);
-        await db.pointEntries.add(entrada).catch(() => {});
+        await db.pointEntries.add(entrada);
       }
 
       const milestone = detectarMilestone(rachaAnterior, nuevaRacha.rachaActual);
       if (milestone) {
         const razonBuscada = `bonus racha ${milestone} días`;
-        const existeBonus = await db.pointEntries
-          .where('habitId').equals(habitId)
-          .filter(e => e.razon.includes(razonBuscada))
-          .count();
-
-        if (existeBonus === 0) {
+        const existeBonus = (await db.pointEntries.where('habitId').equals(habitId).toArray())
+          .some((entry) => entry.razon.includes(razonBuscada));
+        if (!existeBonus) {
           const bonusAmt = BONUS_POR_MILESTONE[milestone] || 0;
           if (bonusAmt > 0) {
             const entryVal = crearEntradaPuntos(
@@ -122,13 +124,11 @@ export function useHabitImpact() {
               'habit'
             );
             addPointEntryInStore(entryVal);
-            await db.pointEntries.add(entryVal).catch(() => {});
+            await db.pointEntries.add(entryVal);
           }
         }
       }
-    } else {
-      await borrarPuntosDeHoy(habitId, targetDate);
-    }
+    });
 
     const taskStore = useTaskStore.getState();
     const journalStore = useJournalStore.getState();

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useHabitStore } from '../../store';
 import { db } from '../../db';
 import { getLocalDateStr } from '../../utils/dateUtils';
@@ -14,57 +14,71 @@ export function useHabitProgress({ onPostCheck }: ProgressOptions) {
   const setLogs = useHabitStore((s) => s.setLogs);
   const updateHabitStore = useHabitStore((s) => s.updateHabit);
   const today = getLocalDateStr();
+  const inFlight = useRef(new Set<string>());
 
   const toggleCheck = useCallback(async (habitId: string, fecha?: string) => {
     const targetDate = fecha || today;
+    const lockKey = `${habitId}:${targetDate}`;
+    if (inFlight.current.has(lockKey)) return;
+    inFlight.current.add(lockKey);
+    try {
+      const existing = logs.find(l => l.habitId === habitId && l.fecha === targetDate);
+      const log = existing
+        ? {
+            ...existing,
+            completado: !existing.completado,
+            timestamp: new Date().toISOString(),
+          }
+        : {
+            id: generateId(),
+            habitId,
+            fecha: targetDate,
+            completado: true,
+            subtareasCompletadas: [],
+            timestamp: new Date().toISOString(),
+          };
 
-    const log = logs.find(l => l.habitId === habitId && l.fecha === targetDate) || {
-      id: generateId(),
-      habitId,
-      fecha: targetDate,
-      completado: false,
-      subtareasCompletadas: [],
-      timestamp: new Date().toISOString()
-    };
-
-    log.completado = !log.completado;
-    log.timestamp = new Date().toISOString();
-
-    await db.habitLogs.put(log);
-    setLogs([...logs.filter(l => l.id !== log.id), log]);
-
-    await onPostCheck(habitId, log.completado, targetDate);
+      await db.habitLogs.put(log);
+      setLogs([...logs.filter(l => l.id !== log.id), log]);
+      await onPostCheck(habitId, log.completado, targetDate);
+    } finally {
+      inFlight.current.delete(lockKey);
+    }
   }, [logs, setLogs, onPostCheck, today]);
 
   const toggleSubtask = useCallback(async (habitId: string, subtaskId: string, fecha?: string) => {
     const targetDate = fecha || today;
+    const lockKey = `${habitId}:${targetDate}:sub`;
+    if (inFlight.current.has(lockKey)) return;
+    inFlight.current.add(lockKey);
+    try {
+      const existing = logs.find(l => l.habitId === habitId && l.fecha === targetDate);
+      const current = existing?.subtareasCompletadas || [];
+      const updated = current.includes(subtaskId)
+        ? current.filter(id => id !== subtaskId)
+        : [...current, subtaskId];
 
-    const log = logs.find(l => l.habitId === habitId && l.fecha === targetDate) || {
-      id: generateId(),
-      habitId,
-      fecha: targetDate,
-      completado: false,
-      subtareasCompletadas: [],
-      timestamp: new Date().toISOString()
-    };
+      const habit = habits.find(h => h.id === habitId);
+      const completado = habit && habit.subtareas.length > 0
+        ? habit.subtareas.every(s => updated.includes(s.id))
+        : existing?.completado ?? false;
 
-    const current = log.subtareasCompletadas || [];
-    const updated = current.includes(subtaskId)
-      ? current.filter(id => id !== subtaskId)
-      : [...current, subtaskId];
+      const log = {
+        id: existing?.id ?? generateId(),
+        habitId,
+        fecha: targetDate,
+        completado,
+        subtareasCompletadas: updated,
+        timestamp: new Date().toISOString(),
+        razonFallo: existing?.razonFallo,
+      };
 
-    log.subtareasCompletadas = updated;
-    log.timestamp = new Date().toISOString();
-
-    const habit = habits.find(h => h.id === habitId);
-    if (habit && habit.subtareas.length > 0) {
-      log.completado = habit.subtareas.every(s => updated.includes(s.id));
+      await db.habitLogs.put(log);
+      setLogs([...logs.filter(l => l.id !== log.id), log]);
+      await onPostCheck(habitId, log.completado, targetDate);
+    } finally {
+      inFlight.current.delete(lockKey);
     }
-
-    await db.habitLogs.put(log);
-    setLogs([...logs.filter(l => l.id !== log.id), log]);
-
-    await onPostCheck(habitId, log.completado, targetDate);
   }, [logs, habits, setLogs, onPostCheck, today]);
 
   const addSubtask = useCallback(async (habitId: string, subtaskName: string) => {

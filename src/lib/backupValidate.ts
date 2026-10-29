@@ -47,10 +47,6 @@ function requireFiniteNumber(item: Record<string, unknown>, key: string): void {
   if (typeof item[key] !== 'number' || !Number.isFinite(item[key] as number)) invalid();
 }
 
-function requireStringArray(value: unknown): void {
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) invalid();
-}
-
 function requireNumberArray(value: unknown): void {
   if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'number' || !Number.isFinite(entry))) {
     invalid();
@@ -97,11 +93,17 @@ function validateLogs(rows: Record<string, unknown>[]): void {
   requireUnique(rows.map((row) => row.id as string));
 }
 
+function requireJournalPhotos(value: unknown): void {
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string' || !entry.startsWith('data:image/'))) {
+    invalid();
+  }
+}
+
 function validateJournal(rows: Record<string, unknown>[]): void {
   for (const row of rows) {
     requireString(row, 'id');
     requireString(row, 'texto');
-    requireStringArray(row.fotos);
+    requireJournalPhotos(row.fotos);
   }
   requireUnique(rows.map((row) => row.id as string));
 }

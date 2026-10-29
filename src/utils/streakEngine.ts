@@ -1,5 +1,5 @@
 import type { Habit, Streak, EstadoRacha } from '../types';
-import { getLocalDateStr, subtractDays, getDayOfWeekFromStr } from './dateUtils';
+import { getLocalDateStr, subtractDays, getDayOfWeekFromStr } from './dateUtils.ts';
 
 /**
  * Calcula la racha actual para un hábito dado sus logs.

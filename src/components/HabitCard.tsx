@@ -190,10 +190,9 @@ export function HabitCard({
                 </button>
                 <button
                   type="button"
-                  onClick={() => { 
-                    console.log('Click en eliminar detectado', habit.id);
-                    setShowMenu(false); 
-                    onDelete(); 
+                  onClick={() => {
+                    setShowMenu(false);
+                    onDelete();
                   }}
                   className="w-full px-4 py-2.5 text-sm text-danger hover:bg-bg-card text-left transition-colors"
                 >

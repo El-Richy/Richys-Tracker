@@ -35,6 +35,18 @@ describe('validateBackupRecord', () => {
     );
   });
 
+  it('rejects journal photos that are not data:image URLs', () => {
+    assert.throws(
+      () => validateBackupRecord({
+        journal: [{ id: 'j1', texto: 'hola', fotos: ['https://evil.example/p.png'] }],
+      }),
+      (error: unknown) => error instanceof Error && error.message === 'invalid_shape',
+    );
+    assert.doesNotThrow(() => validateBackupRecord({
+      journal: [{ id: 'j1', texto: 'hola', fotos: ['data:image/jpeg;base64,QQ=='] }],
+    }));
+  });
+
   it('rejects a backup larger than the import cap', () => {
     assert.throws(
       () => assertImportableBackupSize(MAX_IMPORT_BYTES + 1),

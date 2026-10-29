@@ -143,7 +143,7 @@ export function JournalPage({ filter, onFilterChange }: JournalPageProps) {
 
         {/* Lista agrupada */}
         <div className="space-y-8">
-          {sortedDates.map(dateStr => (
+          {sortedDates.map((dateStr, dateIndex) => (
             <div key={dateStr}>
               <h2 className="text-xs font-bold text-accent uppercase tracking-widest mb-4 px-2">
                 {getDayLabel(dateStr)}
@@ -154,6 +154,7 @@ export function JournalPage({ filter, onFilterChange }: JournalPageProps) {
                     <JournalCard
                       key={entry.id}
                       index={i}
+                      deferOffscreen={dateIndex > 0 || i > 0}
                       entry={entry}
                       onDelete={() => deleteEntry(entry.id)}
                       onEdit={() => {

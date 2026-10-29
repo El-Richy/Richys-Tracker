@@ -20,6 +20,12 @@ body {
 
 
 
+/* Off-screen journal cards skip layout until they approach the viewport. */
+.journal-card-deferred {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 180px;
+}
+
 /* Focus visible para accesibilidad */
 *:focus-visible {
   outline: 2px solid rgb(var(--accent-rgb));
